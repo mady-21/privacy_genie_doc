@@ -1,0 +1,70 @@
+# Environment variables and local configuration
+.env
+.env.*
+!.env.example
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Test coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Jupyter notebooks
+.ipynb_checkpoints/
+
+# AI models, embeddings, and local vector stores
+models/
+checkpoints/
+embeddings/
+vectorstore/
+vector_store/
+faiss_index/
+*.faiss
+*.index
+*.npy
+*.npz
+*.pkl
+*.pickle
+
+# Hugging Face and ML framework caches
+.cache/
+hf_cache/
+wandb/
+mlruns/
+
+# Application-generated data and logs
+data/
+uploads/
+outputs/
+logs/
+*.log
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

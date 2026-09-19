@@ -63,6 +63,10 @@ outputs/
 logs/
 *.log
 
+# Source documents for local processing
+docs/*
+!docs/.gitkeep
+
 # Editors and operating systems
 .vscode/
 .idea/

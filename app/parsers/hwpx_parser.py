@@ -1,34 +1,58 @@
 from pathlib import Path
 from zipfile import ZipFile
-from xml.dom import minidom
+import xml.etree.ElementTree as ET
 
 
 class HwpxParser:
-    def __init__(self, file_path: str, output_dir: str = "/app/docs/extracted"):
+    def __init__(self, file_path: str):
         self.file_path = Path(file_path)
-        self.output_dir = Path(output_dir)
 
-    def list_files(self) -> list[str]:
-        with ZipFile(self.file_path, "r") as hwpx:
-            return hwpx.namelist()
-
-    def extract_section(self, section_name: str = "Contents/section0.xml"):
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+    def parse(self) -> list[str]:
+        paragraphs = []
 
         with ZipFile(self.file_path, "r") as hwpx:
-            xml_data = hwpx.read(section_name)
+            section_files = self._find_section_files(hwpx)
 
-        # 원본 XML
-        raw_path = self.output_dir / "section0.xml"
-        raw_path.write_bytes(xml_data)
+            for section_file in section_files:
+                root = ET.fromstring(hwpx.read(section_file))
+                paragraphs.extend(self._parse_section(root))
 
-        # 확인하기 좋게
-        pretty_xml = minidom.parseString(xml_data).toprettyxml(
-            indent="  ",
-            encoding="utf-8",
+        return paragraphs
+
+    def _find_section_files(self, hwpx: ZipFile) -> list[str]:
+        return sorted(
+            name
+            for name in hwpx.namelist()
+            if name.startswith("Contents/section")
+            and name.endswith(".xml")
         )
 
-        pretty_path = self.output_dir / "section0_pretty.xml"
-        pretty_path.write_bytes(pretty_xml)
+    def _parse_section(self, root: ET.Element) -> list[str]:
+        paragraphs = []
 
-        return raw_path, pretty_path
+        for element in root:
+            if self._local_name(element.tag) != "p":
+                continue
+
+            text = self._extract_text(element)
+
+            if text:
+                paragraphs.append(text)
+
+        return paragraphs
+
+    def _extract_text(self, paragraph: ET.Element) -> str:
+        texts = []
+
+        for element in paragraph.iter():
+            if self._local_name(element.tag) != "t":
+                continue
+
+            if element.text:
+                texts.append(element.text)
+
+        return "".join(texts).strip()
+
+    @staticmethod
+    def _local_name(tag: str) -> str:
+        return tag.split("}")[-1]

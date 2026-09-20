@@ -2,6 +2,20 @@ import json
 import re
 from pathlib import Path
 
+from app.constants.law import (
+    ARTICLE,
+    ARTICLE_CREATED,
+    ARTICLES,
+    CHAPTER,
+    EFFECTIVE_DATE,
+    ITEM,
+    OTHER,
+    PARAGRAPH,
+    SECTION,
+    SUBITEM,
+    TITLE_AMENDED,
+)
+
 
 class LawStructureParser:
     # 법령 구조
@@ -55,33 +69,33 @@ class LawStructureParser:
         text = text.strip()
 
         if self.CHAPTER_PATTERN.match(text):
-            return "chapter"
+            return CHAPTER
 
         if self.SECTION_PATTERN.match(text):
-            return "section"
+            return SECTION
 
         if self.ARTICLE_PATTERN.match(text):
-            return "article"
+            return ARTICLE
 
         if self.PARAGRAPH_PATTERN.match(text):
-            return "paragraph"
+            return PARAGRAPH
 
         if self.ITEM_PATTERN.match(text):
-            return "item"
+            return ITEM
 
         if self.SUBITEM_PATTERN.match(text):
-            return "subitem"
+            return SUBITEM
 
         if self.EFFECTIVE_DATE_PATTERN.match(text):
-            return "effective_date"
+            return EFFECTIVE_DATE
 
         if self.ARTICLE_CREATED_PATTERN.match(text):
-            return "article_created"
+            return ARTICLE_CREATED
 
         if self.TITLE_AMENDED_PATTERN.match(text):
-            return "title_amended"
+            return TITLE_AMENDED
 
-        return "other"
+        return OTHER
 
     def parse(self, paragraphs: list[str]) -> dict:
         document = {
@@ -90,7 +104,7 @@ class LawStructureParser:
                 "effective_date": None,
                 "law_number": None,
             },
-            "articles": [],
+            ARTICLES: [],
         }
 
         # 법률명, 시행일, 법률번호 추출
@@ -114,25 +128,25 @@ class LawStructureParser:
             paragraph_type = self.classify(text)
 
             # 장
-            if paragraph_type == "chapter":
+            if paragraph_type == CHAPTER:
                 current_chapter = text
                 current_section = None
                 continue
 
             # 절
-            if paragraph_type == "section":
+            if paragraph_type == SECTION:
                 current_section = text
                 continue
 
             # 조
-            if paragraph_type == "article":
+            if paragraph_type == ARTICLE:
                 current_article = self._parse_article(
                     text=text,
                     chapter=current_chapter,
                     section=current_section,
                 )
 
-                document["articles"].append(
+                document[ARTICLES].append(
                     current_article
                 )
 
@@ -165,7 +179,7 @@ class LawStructureParser:
 
             # 항
             if (
-                paragraph_type == "paragraph"
+                paragraph_type == PARAGRAPH
                 and current_article
             ):
                 current_paragraph = (
@@ -183,7 +197,7 @@ class LawStructureParser:
 
             # 호
             if (
-                paragraph_type == "item"
+                paragraph_type == ITEM
                 and current_article
             ):
                 item = self._parse_item(text)
@@ -205,7 +219,7 @@ class LawStructureParser:
 
             # 목
             if (
-                paragraph_type == "subitem"
+                paragraph_type == SUBITEM
                 and current_item
             ):
                 current_item[
@@ -218,7 +232,7 @@ class LawStructureParser:
 
             # 본조신설
             if (
-                paragraph_type == "article_created"
+                paragraph_type == ARTICLE_CREATED
                 and current_article
             ):
                 current_article[
@@ -229,7 +243,7 @@ class LawStructureParser:
 
             # 제목개정
             if (
-                paragraph_type == "title_amended"
+                paragraph_type == TITLE_AMENDED
                 and current_article
             ):
                 current_article[
@@ -240,7 +254,7 @@ class LawStructureParser:
 
             # 미래 시행일
             if (
-                paragraph_type == "effective_date"
+                paragraph_type == EFFECTIVE_DATE
                 and current_article
             ):
                 current_article[
@@ -323,8 +337,8 @@ class LawStructureParser:
             "number": number,
             "title": title,
             "location": {
-                "chapter": chapter,
-                "section": section,
+                CHAPTER: chapter,
+                SECTION: section,
             },
             "body": body,
             "paragraphs": [],

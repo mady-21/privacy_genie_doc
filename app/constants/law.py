@@ -15,3 +15,4 @@ TITLE_AMENDED: Final = "title_amended"
 OTHER: Final = "other"
 
 ARTICLES: Final = "articles"
+

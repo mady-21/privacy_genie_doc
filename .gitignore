@@ -39,7 +39,7 @@ coverage.xml
 # AI models, embeddings, and local vector stores
 models/
 checkpoints/
-embeddings/
+# embeddings/
 vectorstore/
 vector_store/
 faiss_index/

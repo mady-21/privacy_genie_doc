@@ -7,7 +7,6 @@ from app.constants.law import (
     ARTICLE_CREATED,
     ARTICLES,
     CHAPTER,
-    EFFECTIVE_DATE,
     ITEM,
     OTHER,
     PARAGRAPH,
@@ -18,6 +17,9 @@ from app.constants.law import (
 
 
 class LawStructureParser:
+    SUPPLEMENT_PATTERN = re.compile(r"^부\s*칙(?:\s|[<〈\[]|$)")
+    DATE_PATTERN = re.compile(r"(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?")
+
     # 법령 구조
     CHAPTER_PATTERN = re.compile(
         r"^제\d+장(?:의\d+)?\s+.+"
@@ -44,10 +46,6 @@ class LawStructureParser:
     )
 
     # 조문 메타데이터
-    EFFECTIVE_DATE_PATTERN = re.compile(
-        r"^\[시행일:"
-    )
-
     ARTICLE_CREATED_PATTERN = re.compile(
         r"^\[본조신설"
     )
@@ -68,6 +66,9 @@ class LawStructureParser:
     def classify(self, text: str) -> str:
         text = text.strip()
 
+        if self.SUPPLEMENT_PATTERN.match(text):
+            return "supplementary"
+
         if self.CHAPTER_PATTERN.match(text):
             return CHAPTER
 
@@ -85,9 +86,6 @@ class LawStructureParser:
 
         if self.SUBITEM_PATTERN.match(text):
             return SUBITEM
-
-        if self.EFFECTIVE_DATE_PATTERN.match(text):
-            return EFFECTIVE_DATE
 
         if self.ARTICLE_CREATED_PATTERN.match(text):
             return ARTICLE_CREATED
@@ -119,6 +117,11 @@ class LawStructureParser:
         current_paragraph = None
         current_item = None
 
+        document["supplements"] = []
+        document["warnings"] = []
+        current_supplement = None
+        occurrence_counts = {}
+
         for text in paragraphs:
             text = text.strip()
 
@@ -126,6 +129,30 @@ class LawStructureParser:
                 continue
 
             paragraph_type = self.classify(text)
+
+            if paragraph_type == "supplementary":
+                number_match = re.search(r"제\s*(\d+)\s*호", text)
+                date_match = self.DATE_PATTERN.search(text)
+                current_supplement = {
+                    "id": f"supplement-{len(document['supplements']) + 1}",
+                    "heading": text,
+                    "law_number": (
+                        f"법률 제{number_match.group(1)}호"
+                        if number_match else None
+                    ),
+                    "promulgation_date": (
+                        self._normalize_date(date_match) if date_match else None
+                    ),
+                    "preamble": [],
+                }
+                document["supplements"].append(current_supplement)
+                current_chapter = current_section = None
+                current_article = current_paragraph = current_item = None
+                continue
+
+            # 원문 순서를 보존해 번호 없는 문장도 청크에서 누락하지 않는다.
+            if current_article and paragraph_type not in (ARTICLE, CHAPTER, SECTION):
+                current_article["source_lines"].append(text)
 
             # 장
             if paragraph_type == CHAPTER:
@@ -145,6 +172,18 @@ class LawStructureParser:
                     chapter=current_chapter,
                     section=current_section,
                 )
+
+                current_article["document_part"] = (
+                    "supplementary" if current_supplement else "main"
+                )
+                current_article["supplement"] = (
+                    dict(current_supplement) if current_supplement else None
+                )
+                current_article["source_lines"] = [text]
+                scope = current_supplement["id"] if current_supplement else "main"
+                key = (scope, current_article["number"])
+                occurrence_counts[key] = occurrence_counts.get(key, 0) + 1
+                current_article["occurrence"] = occurrence_counts[key]
 
                 document[ARTICLES].append(
                     current_article
@@ -252,18 +291,23 @@ class LawStructureParser:
 
                 continue
 
-            # 미래 시행일
-            if (
-                paragraph_type == EFFECTIVE_DATE
-                and current_article
-            ):
-                current_article[
-                    "metadata"
-                ]["effective_date"] = text
-
-                continue
+            if paragraph_type == OTHER and current_supplement and not current_article:
+                if re.match(r"^[<〈\[]", text):
+                    number_match = re.search(r"제\s*(\d+)\s*호", text)
+                    date_match = self.DATE_PATTERN.search(text)
+                    if number_match:
+                        current_supplement["law_number"] = f"법률 제{number_match[1]}호"
+                    if date_match:
+                        current_supplement["promulgation_date"] = self._normalize_date(date_match)
+                    current_supplement["heading"] += " " + text
+                else:
+                    current_supplement["preamble"].append(text)
 
         return document
+
+    @staticmethod
+    def _normalize_date(match) -> str:
+        return f"{int(match[1]):04d}-{int(match[2]):02d}-{int(match[3]):02d}"
 
     def _parse_law_metadata(
         self,
@@ -470,3 +514,4 @@ class LawStructureParser:
             )
 
         return path
+

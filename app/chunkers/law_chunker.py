@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from app.constants.law import ARTICLES, CHAPTER, SECTION
@@ -11,6 +12,13 @@ class LawChunker:
         law = document["law"]
 
         for article in document[ARTICLES]:
+            chapter = article["location"].get(CHAPTER) or ""
+            if (
+                article.get("document_part", "main") == "main"
+                and re.match(r"^제\s*10\s*장\s+벌칙(?:\s|$)", chapter.strip())
+            ):
+                continue
+
             chunk = self._build_article_chunk(
                 law=law,
                 article=article,
@@ -30,7 +38,12 @@ class LawChunker:
             article=article,
         )
 
+        supplement = article.get("supplement")
+        scope = supplement["id"] if supplement else "main"
         return {
+            "chunk_id": f"{law['law_number']}:{scope}:{article['number']}:{article.get('occurrence', 1)}",
+            "document_part": article.get("document_part", "main"),
+            "supplement": supplement,
             "law_name": law["name"],
             "law_number": law["law_number"],
             "law_effective_date": law["effective_date"],
@@ -56,6 +69,18 @@ class LawChunker:
         # 법률명
         if law["name"]:
             lines.append(law["name"])
+
+        supplement = article.get("supplement")
+        if supplement:
+            lines.append(supplement["heading"])
+            lines.extend(supplement.get("preamble", []))
+
+        if "source_lines" in article:
+            for value in (article["location"][CHAPTER], article["location"][SECTION]):
+                if value:
+                    lines.append(value)
+            lines.extend(article["source_lines"])
+            return "\n".join(lines)
 
         # 장
         chapter = article["location"][CHAPTER]
@@ -150,3 +175,4 @@ class LawChunker:
             )
 
         return path
+

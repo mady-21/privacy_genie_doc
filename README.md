@@ -3,6 +3,24 @@
 개인정보보호 관련 문서를 **RAG 검색에 활용할 수 있는 데이터로 변환하고 검색하는 역할**로
 법령뿐만 아니라 향후 지침, 가이드, 평가자료 등 다양한 개인정보보호 관련 문서를 처리하는 것을 목표로 합니다.
 
+## 구조
+- app/parsers: HWPX 추출과 법령 공통 구조 파싱
+- app/chunkers/base_law_chunker.py: 텍스트 구성·메타데이터·JSON 저장
+- app/chunkers/act_chunker.py: 법률 처리 정책(제10장 벌칙 제외)
+- app/chunkers/decree_chunker.py: 시행령 처리 정책(제63조 과태료 제외)
+- documents/source/laws: privacy.hwpx, privacy_decree.hwpx
+- documents/source/guides: 가이드 원문 보관(전용 청커는 아직 미구현)
+- documents/processed/act, decree: 문서별 처리 결과
+
+## Docker 실행
+
+```bash
+docker exec -w /app privacy-genie-doc python rebuild_chunks.py --type act
+docker exec -w /app privacy-genie-doc python rebuild_chunks.py --type decree
+docker exec -w /app privacy-genie-doc python -m unittest discover -s tests -v
+```
+
+
 ### 처리 흐름
 
 ```text

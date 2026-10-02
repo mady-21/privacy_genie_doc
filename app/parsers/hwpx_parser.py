@@ -1,6 +1,7 @@
 from pathlib import Path
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
+import re
 
 
 class HwpxParser:
@@ -19,13 +20,15 @@ class HwpxParser:
 
         return paragraphs
 
+    SECTION_FILE_PATTERN = re.compile(r"Contents/section(\d+)\.xml")
+
     def _find_section_files(self, hwpx: ZipFile) -> list[str]:
-        return sorted(
-            name
-            for name in hwpx.namelist()
-            if name.startswith("Contents/section")
-            and name.endswith(".xml")
-        )
+        sections = []
+        for name in hwpx.namelist():
+            match = self.SECTION_FILE_PATTERN.fullmatch(name)
+            if match:
+                sections.append((int(match[1]), name))
+        return [name for _, name in sorted(sections)]
 
     def _parse_section(self, root: ET.Element) -> list[str]:
         paragraphs = []

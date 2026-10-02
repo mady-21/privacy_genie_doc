@@ -67,6 +67,9 @@ logs/
 docs/*
 !docs/.gitkeep
 
+# Generated document processing output
+/documents/processed/
+
 # Editors and operating systems
 .vscode/
 .idea/

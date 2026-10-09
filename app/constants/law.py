@@ -1,18 +1,45 @@
-"""Names used for legal-document structure and classification."""
-
+"""법령 구조와 JSON 필드명. 저장되는 문자열 값은 변경하지 않는다."""
 from typing import Final
 
-CHAPTER: Final = "chapter"
-SECTION: Final = "section"
-ARTICLE: Final = "article"
-PARAGRAPH: Final = "paragraph"
-ITEM: Final = "item"
-SUBITEM: Final = "subitem"
+LAW: Final = 'law'
+NAME: Final = 'name'
+EFFECTIVE_DATE: Final = 'effective_date'
+LAW_NUMBER: Final = 'law_number'
+ARTICLES: Final = 'articles'
+CHAPTER: Final = 'chapter'
+SECTION: Final = 'section'
+ARTICLE: Final = 'article'
+PARAGRAPH: Final = 'paragraph'
+ITEM: Final = 'item'
+SUBITEM: Final = 'subitem'
+ARTICLE_CREATED: Final = 'article_created'
+TITLE_AMENDED: Final = 'title_amended'
+OTHER: Final = 'other'
+NUMBER: Final = 'number'
+TITLE: Final = 'title'
+LOCATION: Final = 'location'
+BODY: Final = 'body'
+PARAGRAPHS: Final = 'paragraphs'
+ITEMS: Final = 'items'
+SUBITEMS: Final = 'subitems'
+METADATA: Final = 'metadata'
+TEXT: Final = 'text'
+CREATED: Final = 'created'
+SUPPLEMENTS: Final = 'supplements'
+SUPPLEMENT: Final = 'supplement'
+SUPPLEMENTARY: Final = 'supplementary'
+DOCUMENT_PART: Final = 'document_part'
+MAIN: Final = 'main'
+ID: Final = 'id'
+HEADING: Final = 'heading'
+PROMULGATION_DATE: Final = 'promulgation_date'
+PREAMBLE: Final = 'preamble'
+SOURCE_LINES: Final = 'source_lines'
+OCCURRENCE: Final = 'occurrence'
+CHUNK_ID: Final = 'chunk_id'
+LAW_NAME: Final = 'law_name'
+LAW_EFFECTIVE_DATE: Final = 'law_effective_date'
+ARTICLE_NUMBER: Final = 'article_number'
+ARTICLE_TITLE: Final = 'article_title'
 
-EFFECTIVE_DATE: Final = "effective_date"
-ARTICLE_CREATED: Final = "article_created"
-TITLE_AMENDED: Final = "title_amended"
-OTHER: Final = "other"
-
-ARTICLES: Final = "articles"
-
+LAW_METADATA_SCAN_LIMIT: Final = 10

@@ -1,117 +1,50 @@
+from app.constants.paths import CHUNKS_PATH, PREVIEW_DIVIDER, PREVIEW_PATH, PREVIEW_SEPARATOR, TEXT_ENCODING
+from app.constants.law import CHUNK_ID, DOCUMENT_PART, ARTICLE_NUMBER, LAW_EFFECTIVE_DATE, LAW_NAME, LAW_NUMBER, TEXT
 import json
 from pathlib import Path
 
-
 class EmbeddingTextBuilder:
-    def build(
-        self,
-        document_name: str,
-        chunk: dict,
-    ) -> str:
+
+    def build(self, document_name: str, chunk: dict) -> str:
         """청크에 포함된 텍스트를 중복 없이 반환한다."""
-        text = chunk.get("text")
-
+        text = chunk.get(TEXT)
         if not isinstance(text, str) or not text.strip():
-            raise ValueError(
-                f"청크 본문이 없습니다: {chunk.get('article_number')}"
-            )
-
-        # 기존 호출과 호환되도록 document_name 인자는 유지한다.
-        # 법률명과 조문 제목은 이미 text에 포함되어 있다.
+            raise ValueError(f'청크 본문이 없습니다: {chunk.get(ARTICLE_NUMBER)}')
         return text.strip()
 
-    def save_preview(
-        self,
-        chunks: list[dict],
-        output_path: str = (
-            "/app/docs/extracted/embedding_preview.txt"
-        ),
-        article_numbers: list[str] | None = None,
-    ) -> Path:
+    def save_preview(self, chunks: list[dict], output_path: str | Path=PREVIEW_PATH, article_numbers: list[str] | None=None) -> Path:
         """실제 임베딩 입력문을 확인용 파일로 저장한다."""
-        selected = [
-            chunk
-            for chunk in chunks
-            if article_numbers is None
-            or chunk.get("article_number") in article_numbers
-        ]
-
+        article_filter = set(article_numbers) if article_numbers is not None else None
+        selected = [chunk for chunk in chunks if article_filter is None or chunk.get(ARTICLE_NUMBER) in article_filter]
         if not selected:
-            raise ValueError("확인할 조문이 없습니다.")
-
-        # 파일을 쓰기 전에 모든 입력문을 검증한다.
-        previews = [
-            (
-                chunk,
-                self.build(
-                    document_name=chunk.get("law_name", ""),
-                    chunk=chunk,
-                ),
-            )
-            for chunk in selected
-        ]
-
+            raise ValueError('확인할 조문이 없습니다.')
+        previews = [(chunk, self.build(document_name=chunk.get(LAW_NAME, ''), chunk=chunk)) for chunk in selected]
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
-
-        with path.open("w", encoding="utf-8") as file:
-            file.write(f"확인 대상: {len(previews)}개 청크\n\n")
-
-            for index, (chunk, text) in enumerate(
-                previews, start=1
-            ):
-                file.write("=" * 60 + "\n")
-                file.write(
-                    f"[청크 {index}] "
-                    f"{chunk.get('article_number', '')}\n"
-                )
-                file.write(
-                    f"법률번호: {chunk.get('law_number', '')}\n"
-                )
-                file.write(
-                    "법률 시행일: "
-                    f"{chunk.get('law_effective_date', '')}\n"
-                )
-                file.write("-" * 60 + "\n")
+        with path.open('w', encoding=TEXT_ENCODING) as file:
+            file.write(f'확인 대상: {len(previews)}개 청크\n\n')
+            for index, (chunk, text) in enumerate(previews, start=1):
+                file.write(PREVIEW_SEPARATOR + '\n')
+                file.write(f"[청크 {index}] {chunk.get(ARTICLE_NUMBER, '')}\n")
+                for key in (CHUNK_ID, DOCUMENT_PART):
+                    file.write(f"{key}: {chunk.get(key, '')}\n")
+                file.write(f"법률번호: {chunk.get(LAW_NUMBER, '')}\n")
+                file.write(f"법률 시행일: {chunk.get(LAW_EFFECTIVE_DATE, '')}\n")
+                file.write(PREVIEW_DIVIDER + '\n')
                 file.write(text)
-                file.write("\n\n")
-
+                file.write('\n\n')
         return path
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     import argparse
-
-    parser = argparse.ArgumentParser(
-        description="임베딩 입력문을 확인용 파일로 저장"
-    )
-    parser.add_argument(
-        "--input",
-        default="/app/docs/extracted/chunks.json",
-    )
-    parser.add_argument(
-        "--output",
-        default="/app/docs/extracted/embedding_preview.txt",
-    )
-    parser.add_argument(
-        "--articles",
-        nargs="+",
-        help="확인할 조문 번호. 생략하면 전체 저장",
-    )
+    parser = argparse.ArgumentParser(description='임베딩 입력문을 확인용 파일로 저장')
+    parser.add_argument('--input', default=CHUNKS_PATH)
+    parser.add_argument('--output', default=PREVIEW_PATH)
+    parser.add_argument('--articles', nargs='+', help='확인할 조문 번호. 생략하면 전체 저장')
     args = parser.parse_args()
-
-    with Path(args.input).open("r", encoding="utf-8") as file:
+    with Path(args.input).open('r', encoding=TEXT_ENCODING) as file:
         chunks = json.load(file)
-
     if not isinstance(chunks, list):
-        raise ValueError(
-            "입력 JSON은 청크 목록(list)이어야 합니다."
-        )
-
+        raise ValueError('입력 JSON은 청크 목록(list)이어야 합니다.')
     builder = EmbeddingTextBuilder()
-    path = builder.save_preview(
-        chunks=chunks,
-        output_path=args.output,
-        article_numbers=args.articles,
-    )
-    print(f"확인용 파일 저장 완료: {path}")
+    path = builder.save_preview(chunks=chunks, output_path=args.output, article_numbers=args.articles)
+    print(f'확인용 파일 저장 완료: {path}')

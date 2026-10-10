@@ -8,10 +8,16 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      HF_HOME: /models/huggingface
     volumes:
       - .:/app
+      - embedding-models:/models
     networks:
       - privacy-genie-network
+
+volumes:
+  embedding-models:
 
 networks:
   privacy-genie-network:

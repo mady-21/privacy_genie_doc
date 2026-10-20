@@ -1,4 +1,4 @@
-"""시행령: 조 단위 청킹, 보칙을 보존하고 과태료 조문만 제외."""
+"시행령: 조 단위 청킹, 보칙을 보존하고 과태료 조문만 제외."
 from app.constants.law import DOCUMENT_PART, MAIN, NUMBER, TITLE
 from app.chunkers.base_law_chunker import BaseLawChunker
 

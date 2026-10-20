@@ -142,15 +142,12 @@ class LawStructureParser:
         return f'{int(match[1]):04d}-{int(match[2]):02d}-{int(match[3]):02d}'
 
     def _parse_law_metadata(self, paragraphs: list[str], document: dict) -> None:
-        """
-        문서 상단에서 법률 기본정보를 추출한다.
-
-        예:
-        개인정보 보호법
-
-        [시행 2026. 9. 11.]
-        [법률 제21445호, 2026. 3. 10., 일부개정]
-        """
+        # 문서 상단에서 법률 기본정보를 추출한다.
+        # 예:
+        # 개인정보 보호법
+        #
+        # [시행 2026. 9. 11.]
+        # [법률 제21445호, 2026. 3. 10., 일부개정]
         if paragraphs:
             document[LAW][NAME] = paragraphs[0].strip()
         for text in paragraphs[:LAW_METADATA_SCAN_LIMIT]:
@@ -190,10 +187,8 @@ class LawStructureParser:
         return {NUMBER: match.group(1), TEXT: match.group(2).strip()}
 
     def save_classification(self, paragraphs: list[str], output_path: str=CLASSIFICATION_PATH) -> Path:
-        """
-        파싱 전 각 문단이 어떻게 분류되는지
-        확인하기 위한 디버깅 파일.
-        """
+        # 파싱 전 각 문단이 어떻게 분류되는지
+        # 확인하기 위한 디버깅 파일.
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('w', encoding=TEXT_ENCODING) as file:

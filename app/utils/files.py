@@ -1,4 +1,4 @@
-"""출력 파일 생성과 JSON 저장의 공통 처리."""
+"출력 파일 생성과 JSON 저장의 공통 처리."
 import json
 from pathlib import Path
 from app.constants.paths import TEXT_ENCODING

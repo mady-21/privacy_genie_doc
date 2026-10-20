@@ -1,4 +1,4 @@
-"""프로젝트 루트를 기준으로 한 기본 입력·출력 경로."""
+"프로젝트 루트를 기준으로 한 기본 입력·출력 경로."
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

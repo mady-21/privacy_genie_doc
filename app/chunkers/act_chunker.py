@@ -1,4 +1,4 @@
-"""개인정보 보호법: 조 단위 청킹, 제10장 벌칙 제외."""
+"개인정보 보호법: 조 단위 청킹, 제10장 벌칙 제외."
 import re
 from app.constants.law import CHAPTER, DOCUMENT_PART, LOCATION, MAIN
 from app.chunkers.base_law_chunker import BaseLawChunker

@@ -6,28 +6,65 @@ from app.chunkers.act_chunker import ActChunker
 from app.chunkers.decree_chunker import DecreeChunker
 
 
+def _base_chunk_id(chunk: dict) -> str:
+    "분할된 청크의 chunk_id에서 ':partN' suffix를 떼고, 같은 조문의 조각들을 묶기 위한 키."
+    segments = chunk['chunk_id'].split(':')
+    if segments[-1].startswith('part'):
+        segments = segments[:-1]
+    return ':'.join(segments)
+
+
 class DocumentTests(unittest.TestCase):
     def test_uploaded_documents(self):
         cases = (
-            (ACT_SOURCE_PATH, ActChunker(), "법률 제21445호"),
-            (DECREE_SOURCE_PATH, DecreeChunker(), "대통령령 제36671호"),
+            (ACT_SOURCE_PATH, ActChunker(), "법률 제21445호", "제64조의2"),
+            (DECREE_SOURCE_PATH, DecreeChunker(), "대통령령 제36671호", "제42조의6"),
         )
-        for path, chunker, expected_number in cases:
+        for path, chunker, expected_number, long_article_number in cases:
             with self.subTest(source=path.name):
                 document = LawStructureParser().parse(HwpxParser(str(path)).parse())
                 self.assertEqual(document['law']['law_number'], expected_number)
                 chunks = chunker.chunk(document)
                 included = [a for a in document['articles'] if not chunker.should_exclude(a)]
                 self.assertGreater(len(chunks), 0)
-                self.assertEqual(len(chunks), len(included))
                 self.assertEqual(len({c['chunk_id'] for c in chunks}), len(chunks))
-                for article, chunk in zip(included, chunks):
-                    self.assertTrue(chunk['text'].endswith('\n'.join(article['source_lines'])))
-                    self.assertNotIn('article_effective_date', chunk)
+                self.assertNotIn('article_effective_date', chunks[0])
+
+                # 조문 하나가 여러 청크(분할)로 쪼개질 수 있으므로, chunk_id 기준으로
+                # 같은 조문의 조각들을 묶어 조문 개수(len(included))와 1:1 대응시킨다.
+                groups: dict[str, list[dict]] = {}
+                for chunk in chunks:
+                    groups.setdefault(_base_chunk_id(chunk), []).append(chunk)
+                self.assertEqual(len(groups), len(included))
+                for group in groups.values():
+                    group.sort(key=lambda c: c['part_index'])
+                    part_count = group[0]['part_count']
+                    self.assertEqual([c['part_index'] for c in group], list(range(1, len(group) + 1)))
+                    self.assertTrue(all(c['part_count'] == part_count for c in group))
+                    self.assertEqual(len(group), part_count)
+
+                for chunk in chunks:
                     self.assertEqual(chunk['document_type'], chunker.DOCUMENT_TYPE)
                     if chunk['document_part'] == 'supplementary':
                         self.assertIsNone(chunk['chapter'])
                         self.assertEqual(chunk['supplement']['law_number'], expected_number)
+
+                # 분할되지 않은(part_count == 1) 조문은 기존처럼 원문(source_lines)을
+                # 그대로 유지해야 한다 — 분할 로직 도입으로 짧은 조문의 텍스트가
+                # 조금이라도 바뀌면 이 검증이 깨진다.
+                for article in included:
+                    scope = article['supplement']['id'] if article.get('supplement') else 'main'
+                    base_id = f"{expected_number}:{scope}:{article['number']}:{article.get('occurrence', 1)}"
+                    group = groups[base_id]
+                    if len(group) == 1:
+                        self.assertTrue(group[0]['text'].endswith('\n'.join(article['source_lines'])))
+
+                short_article_group = groups[f'{expected_number}:main:제1조:1']
+                self.assertEqual(len(short_article_group), 1)
+                long_article_group = groups.get(f'{expected_number}:main:{long_article_number}:1')
+                self.assertIsNotNone(long_article_group)
+                self.assertGreater(len(long_article_group), 1)
+
                 if chunker.DOCUMENT_TYPE == 'act':
                     self.assertFalse(any(c['chapter'] == '제10장 벌칙' for c in chunks))
                 else:

@@ -7,8 +7,8 @@ DB 저장과 검색은 [privacy_genie_web](https://github.com/mady-21/privacy_ge
 ## 구조
 - app/parsers: HWPX 추출과 법령 공통 구조 파싱
 - app/chunkers/base_law_chunker.py: 텍스트 구성·조문 분할·메타데이터·JSON 저장
-- app/chunkers/act_chunker.py: 법률 처리 정책(제10장 벌칙 중 형사처벌 조문만 제외, 과태료 조문은 포함)
-- app/chunkers/decree_chunker.py: 시행령 처리 정책(모든 조문 포함)
+- app/chunkers/act_chunker.py: 법률 처리 정책(부칙과 제10장 벌칙 중 형사처벌 조문 제외, 과태료 조문은 포함)
+- app/chunkers/decree_chunker.py: 시행령 처리 정책(부칙을 뺀 본문 조문 모두 포함)
 - app/embeddings/embedding_text_builder.py: 임베딩 입력 텍스트 생성(개정이력 annotation 제거, 모델 중립)
 - app/embeddings/embedder.py: 임베딩 모델을 한 번만 불러와 텍스트를 정규화된 벡터로 변환
 - app/constants/embedding.py: 임베딩 모델 이름·벡터 차원·요청 제한
@@ -46,12 +46,17 @@ YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제
 (제2항제15호가 2027-07-01부터 적용)는 `is_effective=false`로 나뉘어 청크화됩니다.
 
 ## 제외 정책
+- 부칙: 법률·시행령 모두 부칙 조문은 청크에서 뺍니다(2026-10-21 결정, 법률 4개·시행령 3개
+  청크). 파싱 결과(`law_structure.json`)에는 남아 있습니다. 조문의 시행 여부는 본문의
+  `[시행일: ...]` 표기로 판단하므로 지장이 없고, 잃는 건 전환기 질문(예: 시행령 부칙 제2조의
+  기존 보호책임자 신고 유예)에 대한 근거입니다. 판단은 `BaseLawChunker.should_exclude`에서
+  하고, 법률·시행령 청커가 이를 그대로 따릅니다.
 - 법률: 제10장 벌칙 중 형사처벌 조문(제70~74조의2)만 제외하고, 과태료 조문(제75·76조)은
   포함합니다. 제외/포함 대상은 `ActChunker.EXCLUDED_ARTICLES` /
   `INCLUDED_PENALTY_ARTICLES`에 (조번호, 제목)으로 명시되어 있고, 벌칙 장에 두 목록
   어디에도 없는 조문이 나타나면(법 개정으로 조문이 추가·재배치된 경우) 조용히 넘어가지
   않고 `ValueError`로 실패합니다. 이 경우 두 목록을 갱신해야 합니다.
-- 시행령: 모든 조문을 포함합니다. 제63조(과태료의 부과기준)는 본문이 "별표 2와 같다"뿐이라
+- 시행령: 본문 조문은 모두 포함합니다. 제63조(과태료의 부과기준)는 본문이 "별표 2와 같다"뿐이라
   과태료 대상·상한 질문까지만 답할 수 있습니다(금액 상세는 아래 "앞으로 할 일").
 
 ## 임베딩 텍스트

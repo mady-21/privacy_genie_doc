@@ -59,20 +59,21 @@ class DocumentTests(unittest.TestCase):
                     self.assertTrue(all(c['article_effective_date'] == group[0]['article_effective_date'] for c in group))
                     self.assertEqual(group[0]['is_effective'], group[0]['article_effective_date'] is None)
 
+                # 부칙은 파싱은 하되 청크에서는 전부 뺀다.
+                self.assertGreater(len(document['supplements']), 0)
+                self.assertTrue(any(a['document_part'] == 'supplementary' for a in document['articles']))
                 for chunk in chunks:
                     self.assertEqual(chunk['document_type'], chunker.DOCUMENT_TYPE)
-                    if chunk['document_part'] == 'supplementary':
-                        self.assertIsNone(chunk['chapter'])
-                        self.assertEqual(chunk['supplement']['law_number'], expected_number)
+                    self.assertEqual(chunk['document_part'], 'main')
+                    self.assertIsNone(chunk['supplement'])
 
                 # 분할되지 않은(part_count == 1) 조문은 기존처럼 원문(source_lines)을
                 # 그대로 유지해야 한다 — 분할 로직 도입으로 짧은 조문의 텍스트가
                 # 조금이라도 바뀌면 이 검증이 깨진다.
                 found_not_effective = set()
                 for article in included:
-                    scope = article['supplement']['id'] if article.get('supplement') else 'main'
                     occurrence = article.get('occurrence', 1)
-                    base_id = f"{expected_number}:{scope}:{article['number']}:{occurrence}"
+                    base_id = f"{expected_number}:main:{article['number']}:{occurrence}"
                     group = groups[base_id]
                     if len(group) == 1:
                         self.assertTrue(group[0]['text'].endswith('\n'.join(article['source_lines'])))

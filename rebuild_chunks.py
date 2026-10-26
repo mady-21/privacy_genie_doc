@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 
-from app.constants.law import SUPPLEMENTS
+from app.constants.law import ARTICLES
 from app.constants.paths import (
     DEFAULT_SOURCE_PATH, EXTRACTED_DIR, CLASSIFICATION_FILENAME,
     STRUCTURE_FILENAME, CHUNKS_FILENAME, PREVIEW_FILENAME,
@@ -37,7 +37,8 @@ def main():
     preview = EmbeddingTextBuilder().save_preview(
         chunks, args.output_dir / PREVIEW_FILENAME
     )
-    print(f'{len(chunks)}개 청크 / 부칙 {len(document[SUPPLEMENTS])}개')
+    excluded = sum(1 for article in document[ARTICLES] if chunker.should_exclude(article))
+    print(f'{len(chunks)}개 청크 (조문 {excluded}개 제외: 부칙·형사처벌 조문 등)')
     print(f'확인 파일: {preview}')
 
 

@@ -4,12 +4,9 @@ from pathlib import Path
 
 import numpy as np
 
-from app.chunkers.act_chunker import ActChunker
-from app.chunkers.decree_chunker import DecreeChunker
 from app.constants.law import ARTICLE_NUMBER, DOCUMENT_PART, IS_EFFECTIVE, MAIN
-from app.constants.paths import ACT_SOURCE_PATH, DECREE_SOURCE_PATH, RETRIEVAL_EVAL_PATH, TEXT_ENCODING
-from app.parsers.hwpx_parser import HwpxParser
-from app.parsers.law_structure_parser import LawStructureParser
+from app.constants.paths import RETRIEVAL_EVAL_PATH, TEXT_ENCODING
+from app.documents.law_documents import LAW_SOURCES, chunk_law_document
 
 
 def load_eval_set(path: str | Path = RETRIEVAL_EVAL_PATH) -> dict:
@@ -20,9 +17,8 @@ def load_eval_set(path: str | Path = RETRIEVAL_EVAL_PATH) -> dict:
 def build_law_chunks(max_chunk_chars: float | None = None) -> list[dict]:
     "법률·시행령 원문에서 청크를 메모리로 바로 만든다."
     chunks = []
-    for path, chunker in ((ACT_SOURCE_PATH, ActChunker(max_chunk_chars)), (DECREE_SOURCE_PATH, DecreeChunker(max_chunk_chars))):
-        document = LawStructureParser().parse(HwpxParser(str(path)).parse())
-        chunks.extend(chunker.chunk(document))
+    for document_type in LAW_SOURCES:
+        chunks.extend(chunk_law_document(document_type, max_chunk_chars)[1])
     return chunks
 
 

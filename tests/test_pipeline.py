@@ -141,6 +141,17 @@ class ChunkSplittingTests(unittest.TestCase):
         self.assertEqual(chunks[0]['part_count'], 1)
         self.assertIn('중간에 끊이지 않고', chunks[0]['text'])
 
+    def test_max_chunk_chars_can_be_set_per_instance(self):
+        paragraphs = [
+            '법', '제1조(목적) 이 법의 목적을 정한다.',
+            '① 첫째 항목에 대한 비교적 긴 설명 문장이다.',
+            '② 둘째 항목에 대한 비교적 긴 설명 문장이다.',
+        ]
+        document = LawStructureParser().parse(paragraphs)
+        self.assertEqual(len(LawChunker(max_chunk_chars=10).chunk(document)), 2)
+        self.assertEqual(len(LawChunker(max_chunk_chars=float('inf')).chunk(document)), 1)
+        self.assertEqual(LawChunker().MAX_CHUNK_CHARS, 1000)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -5,18 +5,17 @@ import re
 from pathlib import Path
 
 class EmbeddingTextBuilder:
-    PASSAGE_PREFIX = 'passage: '
     ANGLE_BRACKET_PATTERN = re.compile(r'<[^<>]*>')
     ANNOTATION_KEYWORDS = ('본조신설', '전문개정', '제목개정', '시행일')
     SQUARE_BRACKET_ANNOTATION_PATTERN = re.compile(r'\[\s*(?:' + '|'.join(ANNOTATION_KEYWORDS) + r')[^\[\]]*\]')
     MULTI_SPACE_PATTERN = re.compile(r'[ \t]{2,}')
 
     def build(self, document_name: str, chunk: dict) -> str:
-        "청크 본문을 임베딩 모델 입력(passage 프리픽스 + 개정이력 annotation 제거)으로 변환한다."
+        "청크 본문에서 개정이력 annotation을 걷어낸 임베딩 입력 텍스트를 만든다. 특정 모델용 프리픽스는 붙이지 않는다."
         text = chunk.get(TEXT)
         if not isinstance(text, str) or not text.strip():
             raise ValueError(f'청크 본문이 없습니다: {chunk.get(ARTICLE_NUMBER)}')
-        return self.PASSAGE_PREFIX + self._strip_annotations(text.strip())
+        return self._strip_annotations(text.strip())
 
     def _strip_annotations(self, text: str) -> str:
         # 개정이력 annotation(<개정 ...>, [본조신설 ...] 등)을 제거한다.

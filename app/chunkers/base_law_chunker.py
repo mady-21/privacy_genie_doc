@@ -6,7 +6,11 @@ from app.parsers.law_structure_parser import LawStructureParser
 from pathlib import Path
 
 class BaseLawChunker:
-    MAX_CHUNK_CHARS: int = 1000
+    MAX_CHUNK_CHARS: float = 1000
+
+    def __init__(self, max_chunk_chars: float | None = None):
+        if max_chunk_chars is not None:
+            self.MAX_CHUNK_CHARS = max_chunk_chars
 
     def should_exclude(self, article: dict) -> bool:
         return False

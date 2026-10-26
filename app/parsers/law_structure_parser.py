@@ -1,6 +1,6 @@
 from app.utils.files import save_json as write_json
 from app.constants.paths import CLASSIFICATION_PATH, STRUCTURE_PATH, TEXT_ENCODING
-from app.constants.law import ARTICLE, ARTICLES, ARTICLE_CREATED, BODY, CHAPTER, CREATED, DOCUMENT_PART, EFFECTIVE_DATE, HEADING, ID, ITEM, ITEMS, LAW, LAW_METADATA_SCAN_LIMIT, LAW_NUMBER, LOCATION, MAIN, METADATA, NAME, NUMBER, OCCURRENCE, OTHER, PARAGRAPH, PARAGRAPHS, PREAMBLE, PROMULGATION_DATE, SECTION, SOURCE_LINES, SUBITEM, SUBITEMS, SUPPLEMENT, SUPPLEMENTARY, SUPPLEMENTS, TEXT, TITLE, TITLE_AMENDED
+from app.constants.law import ARTICLE, ARTICLES, ARTICLE_CREATED, ARTICLE_EFFECTIVE, ARTICLE_EFFECTIVE_DATE, BODY, CHAPTER, CREATED, DOCUMENT_PART, EFFECTIVE_DATE, HEADING, ID, IS_EFFECTIVE, ITEM, ITEMS, LAW, LAW_METADATA_SCAN_LIMIT, LAW_NUMBER, LOCATION, MAIN, METADATA, NAME, NUMBER, OCCURRENCE, OTHER, PARAGRAPH, PARAGRAPHS, PREAMBLE, PROMULGATION_DATE, SECTION, SOURCE_LINES, SUBITEM, SUBITEMS, SUPPLEMENT, SUPPLEMENTARY, SUPPLEMENTS, TEXT, TITLE, TITLE_AMENDED
 import re
 from pathlib import Path
 
@@ -15,6 +15,7 @@ class LawStructureParser:
     SUBITEM_PATTERN = re.compile('^([가-하])\\.\\s*(.*)$')
     ARTICLE_CREATED_PATTERN = re.compile('^\\[본조신설')
     TITLE_AMENDED_PATTERN = re.compile('^\\[제목개정')
+    ARTICLE_EFFECTIVE_PATTERN = re.compile(r'^\[시행일\s*:')
     LAW_EFFECTIVE_PATTERN = re.compile('\\[시행\\s+(\\d{4}\\.\\s*\\d{1,2}\\.\\s*\\d{1,2}\\.)\\]')
     SUPPLEMENT_NUMBER_PATTERN = re.compile(r"(?:법률|대통령령)\s+제\s*\d+\s*호")
     LAW_NUMBER_PATTERN = re.compile(r'\[((?:법률|대통령령)\s+제\d+호)')
@@ -39,6 +40,8 @@ class LawStructureParser:
             return ARTICLE_CREATED
         if self.TITLE_AMENDED_PATTERN.match(text):
             return TITLE_AMENDED
+        if self.ARTICLE_EFFECTIVE_PATTERN.match(text):
+            return ARTICLE_EFFECTIVE
         return OTHER
 
     def parse(self, paragraphs: list[str]) -> dict:
@@ -113,6 +116,12 @@ class LawStructureParser:
             if paragraph_type == TITLE_AMENDED and current_article:
                 current_article[METADATA][TITLE_AMENDED] = text
                 continue
+            if paragraph_type == ARTICLE_EFFECTIVE and current_article:
+                date_match = self.DATE_PATTERN.search(text)
+                if date_match:
+                    current_article[ARTICLE_EFFECTIVE_DATE] = self._normalize_date(date_match)
+                    current_article[IS_EFFECTIVE] = False
+                continue
             if paragraph_type == OTHER and current_supplement and (not current_article):
                 if re.match('^[<〈\\[]', text):
                     number_match = self._supplement_number_match(text, document[LAW][LAW_NUMBER])
@@ -142,22 +151,20 @@ class LawStructureParser:
         return f'{int(match[1]):04d}-{int(match[2]):02d}-{int(match[3]):02d}'
 
     def _parse_law_metadata(self, paragraphs: list[str], document: dict) -> None:
-        """
-        문서 상단에서 법률 기본정보를 추출한다.
-
-        예:
-        개인정보 보호법
-
-        [시행 2026. 9. 11.]
-        [법률 제21445호, 2026. 3. 10., 일부개정]
-        """
+        # 문서 상단에서 법률 기본정보를 추출한다.
+        # 예:
+        # 개인정보 보호법
+        #
+        # [시행 2026. 9. 11.]
+        # [법률 제21445호, 2026. 3. 10., 일부개정]
         if paragraphs:
             document[LAW][NAME] = paragraphs[0].strip()
         for text in paragraphs[:LAW_METADATA_SCAN_LIMIT]:
             text = text.strip()
             effective_match = self.LAW_EFFECTIVE_PATTERN.search(text)
             if effective_match:
-                document[LAW][EFFECTIVE_DATE] = effective_match.group(1)
+                date_match = self.DATE_PATTERN.search(effective_match.group(1))
+                document[LAW][EFFECTIVE_DATE] = self._normalize_date(date_match) if date_match else effective_match.group(1)
             law_number_match = self.LAW_NUMBER_PATTERN.search(text)
             if law_number_match:
                 document[LAW][LAW_NUMBER] = law_number_match.group(1)
@@ -169,7 +176,7 @@ class LawStructureParser:
         number = match.group(1)
         title = match.group(2)
         body = match.group(3).strip()
-        return {NUMBER: number, TITLE: title, LOCATION: {CHAPTER: chapter, SECTION: section}, BODY: body, PARAGRAPHS: [], ITEMS: [], METADATA: {}}
+        return {NUMBER: number, TITLE: title, LOCATION: {CHAPTER: chapter, SECTION: section}, BODY: body, PARAGRAPHS: [], ITEMS: [], METADATA: {}, ARTICLE_EFFECTIVE_DATE: None, IS_EFFECTIVE: True}
 
     def _parse_paragraph(self, text: str) -> dict:
         match = self.PARAGRAPH_PATTERN.match(text)
@@ -190,10 +197,8 @@ class LawStructureParser:
         return {NUMBER: match.group(1), TEXT: match.group(2).strip()}
 
     def save_classification(self, paragraphs: list[str], output_path: str=CLASSIFICATION_PATH) -> Path:
-        """
-        파싱 전 각 문단이 어떻게 분류되는지
-        확인하기 위한 디버깅 파일.
-        """
+        # 파싱 전 각 문단이 어떻게 분류되는지
+        # 확인하기 위한 디버깅 파일.
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open('w', encoding=TEXT_ENCODING) as file:

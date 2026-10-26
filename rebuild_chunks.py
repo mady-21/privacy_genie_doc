@@ -1,4 +1,4 @@
-"""문서 파싱·청킹·임베딩 확인 파일을 한 번에 생성한다."""
+"문서 파싱·청킹·임베딩 확인 파일을 한 번에 생성한다."
 import argparse
 from pathlib import Path
 

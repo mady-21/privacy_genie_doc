@@ -1,4 +1,4 @@
-"""프로젝트 루트를 기준으로 한 기본 입력·출력 경로."""
+"프로젝트 루트를 기준으로 한 기본 입력·출력 경로."
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -10,6 +10,8 @@ LAW_DIR = SOURCE_DIR / "laws"
 ACT_SOURCE_PATH = LAW_DIR / "privacy.hwpx"
 DECREE_SOURCE_PATH = LAW_DIR / "privacy_decree.hwpx"
 DEFAULT_SOURCE_PATH = ACT_SOURCE_PATH
+EVALUATION_DIR = PROJECT_ROOT / "evaluation"
+RETRIEVAL_EVAL_PATH = EVALUATION_DIR / "retrieval_eval_v1.json"
 STRUCTURE_FILENAME = "law_structure.json"
 CHUNKS_FILENAME = "chunks.json"
 CLASSIFICATION_FILENAME = "classified_paragraphs.txt"

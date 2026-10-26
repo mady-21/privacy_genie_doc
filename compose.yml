@@ -8,10 +8,18 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      HF_HOME: /models/huggingface
+      # 모델은 볼륨에 받아 둔 캐시만 쓴다(시작할 때 Hugging Face 서버에 접속하지 않음).
+      HF_HUB_OFFLINE: "1"
     volumes:
       - .:/app
+      - embedding-models:/models
     networks:
       - privacy-genie-network
+
+volumes:
+  embedding-models:
 
 networks:
   privacy-genie-network:

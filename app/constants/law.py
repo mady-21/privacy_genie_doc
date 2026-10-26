@@ -1,4 +1,4 @@
-"""법령 구조와 JSON 필드명. 저장되는 문자열 값은 변경하지 않는다."""
+"법령 구조와 JSON 필드명. 저장되는 문자열 값은 변경하지 않는다."
 from typing import Final
 
 LAW: Final = 'law'
@@ -14,6 +14,9 @@ ITEM: Final = 'item'
 SUBITEM: Final = 'subitem'
 ARTICLE_CREATED: Final = 'article_created'
 TITLE_AMENDED: Final = 'title_amended'
+ARTICLE_EFFECTIVE: Final = 'article_effective'
+ARTICLE_EFFECTIVE_DATE: Final = 'article_effective_date'
+IS_EFFECTIVE: Final = 'is_effective'
 OTHER: Final = 'other'
 NUMBER: Final = 'number'
 TITLE: Final = 'title'
@@ -41,5 +44,7 @@ LAW_NAME: Final = 'law_name'
 LAW_EFFECTIVE_DATE: Final = 'law_effective_date'
 ARTICLE_NUMBER: Final = 'article_number'
 ARTICLE_TITLE: Final = 'article_title'
+PART_INDEX: Final = 'part_index'
+PART_COUNT: Final = 'part_count'
 
 LAW_METADATA_SCAN_LIMIT: Final = 10

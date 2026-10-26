@@ -11,7 +11,7 @@ from app.evaluation.retrieval import build_law_chunks, evaluate, hit_at_k, load_
 
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
-    cli.add_argument('--model', required=True, help='Hugging Face 모델 이름 (예: BAAI/bge-m3)')
+    cli.add_argument('--model', required=True, help='Hugging Face 모델 이름 (예: nlpai-lab/KURE-v1)')
     split = cli.add_mutually_exclusive_group()
     split.add_argument('--max-chunk-chars', type=int, help='청크 분할 기준 글자 수 (기본: BaseLawChunker.MAX_CHUNK_CHARS)')
     split.add_argument('--no-split', action='store_true', help='긴 조문도 분할하지 않음')

@@ -53,8 +53,7 @@ YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제
 ## 임베딩 텍스트
 `EmbeddingTextBuilder`는 청크의 원문(`text`, 인용·출력용으로 그대로 보존)과는 별도로,
 임베딩 모델에 넣을 입력 문자열을 만듭니다. 임베딩 모델은 아직 정하지 않았으므로 특정
-모델용 프리픽스(예: e5의 `query:`/`passage:`)는 붙이지 않습니다. 모델별 입력 규칙은
-모델을 정한 뒤에 추가합니다.
+모델용 프리픽스는 붙이지 않습니다. 모델별 입력 규칙은 모델을 정한 뒤에 추가합니다.
 - `<개정 ...>`, `<신설 ...>` 같은 앵글브래킷과 `[본조신설 ...]`, `[전문개정 ...]`,
   `[제목개정 ...]`, `[시행일: ...]`로 시작하는 스퀘어브래킷을 제거합니다. 다른
   스퀘어브래킷(예: 시행령의 `[법인의 경우에는 ...]`처럼 실질 내용을 담은 것)은 보존합니다.
@@ -81,15 +80,14 @@ annotation 제거 규칙을 검증하고(`tests/test_pipeline.py`, `tests/test_e
 입력을 받는 모델은 분할하지 않은 조건과 같이 비교합니다).
 
 ```bash
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model BAAI/bge-m3
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model BAAI/bge-m3 --no-split
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model BAAI/bge-m3 --output documents/processed/eval/bge-m3.json
+docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1
+docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1 --no-split
+docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1 --output documents/processed/eval/kure-v1.json
 ```
 
 ## 앞으로 할 일
 - 임베딩 모델 결정: 후보 모델 다운로드 → 분할/비분할 조건으로 측정 → ADR 작성 → 결정 반영
-  (모델별 입력 규칙, 분할 기준, 벡터 차원). 평가셋 문서가 베이스라인으로 둔 e5-small을 다시
-  후보로 쓴다면 `query:`/`passage:` 프리픽스 처리를 그때 추가해야 공정합니다.
+  (모델별 입력 규칙, 분할 기준, 벡터 차원).
 - 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
   있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
 - 가이드·지침 문서 전용 청킹 전략.

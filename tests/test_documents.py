@@ -16,11 +16,26 @@ def _base_chunk_id(chunk: dict) -> str:
 
 class DocumentTests(unittest.TestCase):
     def test_uploaded_documents(self):
+        # 실측(hwpx 원문)으로 확인한, 원문에 [시행일: ...] 미리보기가 붙어 있는
+        # (조번호, occurrence) 목록 — 해당 occurrence만 is_effective=False여야 한다.
         cases = (
-            (ACT_SOURCE_PATH, ActChunker(), "법률 제21445호", "제64조의2"),
-            (DECREE_SOURCE_PATH, DecreeChunker(), "대통령령 제36671호", "제42조의6"),
+            (
+                ACT_SOURCE_PATH, ActChunker(), "법률 제21445호", "제64조의2",
+                # 제75조(과태료)에도 occurrence 2(2027-07-01 미시행)가 있지만, 제10장
+                # 벌칙 전체가 현재 ActChunker에서 제외되고 있어 이 테스트의 chunk 목록에는
+                # 아직 등장하지 않는다 — 과태료 포함(A단계) 작업 때 함께 추가해야 한다.
+                {
+                    ('제2조', 2), ('제7조의9', 2), ('제28조의12', 1), ('제28조의13', 1),
+                    ('제28조의14', 1), ('제28조의15', 1), ('제32조의2', 2),
+                    ('제37조의2', 2),
+                },
+            ),
+            (
+                DECREE_SOURCE_PATH, DecreeChunker(), "대통령령 제36671호", "제42조의6",
+                {('제42조의2', 1)},
+            ),
         )
-        for path, chunker, expected_number, long_article_number in cases:
+        for path, chunker, expected_number, long_article_number, not_effective in cases:
             with self.subTest(source=path.name):
                 document = LawStructureParser().parse(HwpxParser(str(path)).parse())
                 self.assertEqual(document['law']['law_number'], expected_number)
@@ -28,7 +43,6 @@ class DocumentTests(unittest.TestCase):
                 included = [a for a in document['articles'] if not chunker.should_exclude(a)]
                 self.assertGreater(len(chunks), 0)
                 self.assertEqual(len({c['chunk_id'] for c in chunks}), len(chunks))
-                self.assertNotIn('article_effective_date', chunks[0])
 
                 # 조문 하나가 여러 청크(분할)로 쪼개질 수 있으므로, chunk_id 기준으로
                 # 같은 조문의 조각들을 묶어 조문 개수(len(included))와 1:1 대응시킨다.
@@ -42,6 +56,11 @@ class DocumentTests(unittest.TestCase):
                     self.assertEqual([c['part_index'] for c in group], list(range(1, len(group) + 1)))
                     self.assertTrue(all(c['part_count'] == part_count for c in group))
                     self.assertEqual(len(group), part_count)
+                    # is_effective/article_effective_date는 조문 전체에 적용되는 값이라
+                    # 분할된 모든 part가 같은 값을 가져야 한다.
+                    self.assertTrue(all(c['is_effective'] == group[0]['is_effective'] for c in group))
+                    self.assertTrue(all(c['article_effective_date'] == group[0]['article_effective_date'] for c in group))
+                    self.assertEqual(group[0]['is_effective'], group[0]['article_effective_date'] is None)
 
                 for chunk in chunks:
                     self.assertEqual(chunk['document_type'], chunker.DOCUMENT_TYPE)
@@ -52,12 +71,19 @@ class DocumentTests(unittest.TestCase):
                 # 분할되지 않은(part_count == 1) 조문은 기존처럼 원문(source_lines)을
                 # 그대로 유지해야 한다 — 분할 로직 도입으로 짧은 조문의 텍스트가
                 # 조금이라도 바뀌면 이 검증이 깨진다.
+                found_not_effective = set()
                 for article in included:
                     scope = article['supplement']['id'] if article.get('supplement') else 'main'
-                    base_id = f"{expected_number}:{scope}:{article['number']}:{article.get('occurrence', 1)}"
+                    occurrence = article.get('occurrence', 1)
+                    base_id = f"{expected_number}:{scope}:{article['number']}:{occurrence}"
                     group = groups[base_id]
                     if len(group) == 1:
                         self.assertTrue(group[0]['text'].endswith('\n'.join(article['source_lines'])))
+                    expect_not_effective = (article['number'], occurrence) in not_effective
+                    self.assertEqual(group[0]['is_effective'], not expect_not_effective)
+                    if expect_not_effective:
+                        found_not_effective.add((article['number'], occurrence))
+                self.assertEqual(found_not_effective, not_effective)
 
                 short_article_group = groups[f'{expected_number}:main:제1조:1']
                 self.assertEqual(len(short_article_group), 1)

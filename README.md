@@ -23,6 +23,22 @@
 의미가 통해야 하기 때문에 의도된 중복입니다). `chunk_id`에는 분할된 경우에만
 `:part{N}` suffix가 붙고, 모든 청크에 `part_index`/`part_count` 필드가 있습니다.
 
+## 시행일 메타데이터
+법령 원문에는 현재 시행 중인 조문과, 아직 시행되지 않은 개정 미리보기(`[시행일:
+YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제2조가 현행/미시행
+두 occurrence로 나뉘어 각각 청크가 됨). 이를 구분하기 위해 모든 청크에
+`is_effective`(기본 `true`)와 `article_effective_date`(기본 `null`)를 항상 포함합니다.
+`[시행일: ...]` 표기가 붙은 occurrence만 `is_effective=false`,
+`article_effective_date`에 ISO 날짜가 채워집니다.
+
+판단 기준은 실행 시점(wall-clock)이 아니라 **원문에 표기가 있는지 여부**입니다. 그래서
+같은 hwpx로 언제 다시 빌드해도 같은 결과가 나옵니다. 법령 전체의 `law_effective_date`,
+부칙의 `promulgation_date`도 모두 ISO(`YYYY-MM-DD`) 형식으로 통일되어 있습니다.
+
+제75조(과태료)에도 미시행 occurrence가 있지만, 제10장 벌칙 전체가 현재 제외되고 있어
+아직 청크로 나오지 않습니다 — 과태료 조문을 포함시킬 때(아래 "앞으로 할 일") 같이
+검증해야 합니다.
+
 ## 임베딩 텍스트
 `EmbeddingTextBuilder`는 청크의 원문(`text`, 인용·출력용으로 그대로 보존)과는 별도로,
 임베딩 모델에 넣을 입력 문자열을 만듭니다.
@@ -36,6 +52,15 @@
 로직의 실제 검증은 `tests/`의 unittest assertion으로 합니다. 합성 fixture로 분할 경계·
 annotation 제거 규칙을 검증하고(`tests/test_pipeline.py`, `tests/test_embeddings.py`),
 실제 hwpx 문서로 회귀를 가드합니다(`tests/test_documents.py`).
+
+## 앞으로 할 일
+- 과태료 조문 포함: `ActChunker`를 장(章) 단위 제외에서 조 단위 제외로 바꿔서, 제10장
+  벌칙 중 형벌 조문(제70~74조의2)은 제외하고 과태료 조문(제75·76조)은 포함. `DecreeChunker`의
+  제63조(과태료의 부과기준) 제외도 해제.
+- 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
+  있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
+- 가이드·지침 문서 전용 청킹 전략.
+- 임베딩 모델 선정(평가셋 기반 비교), 벡터 저장소·검색 API 연동.
 
 ## Docker 실행
 

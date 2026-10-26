@@ -1,7 +1,7 @@
 import re
 from app.utils.files import save_json as write_json
 from app.constants.paths import CHUNKS_PATH, TEXT_ENCODING
-from app.constants.law import ARTICLES, ARTICLE_NUMBER, ARTICLE_TITLE, BODY, CHAPTER, CHUNK_ID, DOCUMENT_PART, EFFECTIVE_DATE, HEADING, ID, ITEMS, LAW, LAW_EFFECTIVE_DATE, LAW_NAME, LAW_NUMBER, LOCATION, MAIN, METADATA, NAME, NUMBER, OCCURRENCE, PARAGRAPHS, PART_COUNT, PART_INDEX, PREAMBLE, SECTION, SOURCE_LINES, SUBITEMS, SUPPLEMENT, TEXT, TITLE
+from app.constants.law import ARTICLES, ARTICLE_EFFECTIVE_DATE, ARTICLE_NUMBER, ARTICLE_TITLE, BODY, CHAPTER, CHUNK_ID, DOCUMENT_PART, EFFECTIVE_DATE, HEADING, ID, IS_EFFECTIVE, ITEMS, LAW, LAW_EFFECTIVE_DATE, LAW_NAME, LAW_NUMBER, LOCATION, MAIN, METADATA, NAME, NUMBER, OCCURRENCE, PARAGRAPHS, PART_COUNT, PART_INDEX, PREAMBLE, SECTION, SOURCE_LINES, SUBITEMS, SUPPLEMENT, TEXT, TITLE
 from app.parsers.law_structure_parser import LawStructureParser
 from pathlib import Path
 
@@ -77,7 +77,7 @@ class BaseLawChunker:
         chunk_id = f'{law[LAW_NUMBER]}:{scope}:{article[NUMBER]}:{article.get(OCCURRENCE, 1)}'
         if part_count > 1:
             chunk_id += f':part{part_index}'
-        return {'document_type': self.DOCUMENT_TYPE, CHUNK_ID: chunk_id, DOCUMENT_PART: article.get(DOCUMENT_PART, MAIN), SUPPLEMENT: supplement, LAW_NAME: law[NAME], LAW_NUMBER: law[LAW_NUMBER], LAW_EFFECTIVE_DATE: law[EFFECTIVE_DATE], ARTICLE_NUMBER: article[NUMBER], ARTICLE_TITLE: article[TITLE], CHAPTER: article[LOCATION][CHAPTER], SECTION: article[LOCATION][SECTION], TEXT: text, METADATA: article[METADATA], PART_INDEX: part_index, PART_COUNT: part_count}
+        return {'document_type': self.DOCUMENT_TYPE, CHUNK_ID: chunk_id, DOCUMENT_PART: article.get(DOCUMENT_PART, MAIN), SUPPLEMENT: supplement, LAW_NAME: law[NAME], LAW_NUMBER: law[LAW_NUMBER], LAW_EFFECTIVE_DATE: law[EFFECTIVE_DATE], ARTICLE_NUMBER: article[NUMBER], ARTICLE_TITLE: article[TITLE], CHAPTER: article[LOCATION][CHAPTER], SECTION: article[LOCATION][SECTION], TEXT: text, METADATA: article[METADATA], PART_INDEX: part_index, PART_COUNT: part_count, ARTICLE_EFFECTIVE_DATE: article[ARTICLE_EFFECTIVE_DATE], IS_EFFECTIVE: article[IS_EFFECTIVE]}
 
     def _prefix_lines(self, law: dict, article: dict) -> list[str]:
         lines = []

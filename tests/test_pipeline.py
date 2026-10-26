@@ -23,7 +23,10 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len({x['chunk_id'] for x in chunks}), 3)
         self.assertIn('가. 목\n이어지는 문장', chunks[0]['text'])
         self.assertIn('[시행일: 2027. 3. 9.]', chunks[1]['text'])
-        self.assertNotIn('article_effective_date', chunks[1])
+        self.assertTrue(chunks[0]['is_effective'])
+        self.assertIsNone(chunks[0]['article_effective_date'])
+        self.assertFalse(chunks[1]['is_effective'])
+        self.assertEqual(chunks[1]['article_effective_date'], '2027-03-09')
         self.assertEqual(chunks[2]['document_part'], 'supplementary')
         self.assertIsNone(chunks[2]['chapter'])
         self.assertEqual(chunks[2]['supplement']['law_number'], '법률 제123호')
@@ -41,6 +44,11 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(chunks[0]['part_index'], 1)
         self.assertEqual(chunks[0]['part_count'], 1)
         self.assertNotIn(':part', chunks[0]['chunk_id'])
+
+    def test_law_effective_date_is_normalized_to_iso(self):
+        paragraphs = ['법', '[시행 2026. 9. 11.]', '[법률 제21445호, 2026. 3. 10., 일부개정]', '제1조(목적) 본문.']
+        document = LawStructureParser().parse(paragraphs)
+        self.assertEqual(document['law']['effective_date'], '2026-09-11')
 
     def test_numeric_section_order(self):
         with TemporaryDirectory() as temp:

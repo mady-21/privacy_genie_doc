@@ -1,7 +1,8 @@
 ## privacy-genie-doc
 
-개인정보보호 관련 문서를 **RAG 검색에 활용할 수 있는 데이터로 변환하고 검색하는 역할**로
+개인정보보호 관련 문서를 **RAG 검색에 활용할 수 있는 청크와 임베딩으로 가공하는 역할**로
 법령뿐만 아니라 향후 지침, 가이드, 평가자료 등 다양한 개인정보보호 관련 문서를 처리하는 것을 목표로 합니다.
+DB 저장과 검색은 [privacy_genie_web](https://github.com/mady-21/privacy_genie_web)이 맡습니다(아래 "역할 분담").
 
 ## 구조
 - app/parsers: HWPX 추출과 법령 공통 구조 파싱
@@ -91,7 +92,9 @@ docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai
 - 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
   있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
 - 가이드·지침 문서 전용 청킹 전략.
-- 벡터 저장소(모델이 정해져야 벡터 차원이 정해짐)·검색 API 연동.
+- 임베딩 API: 텍스트를 받아 벡터를 돌려주는 FastAPI 엔드포인트(문서 일괄용, 질문용).
+- web 연동: 벡터 차원, `chunk_id` 형식, `is_effective` 등 청크 필드를 web에 전달해서 스키마·
+  저장·검색을 구현하게 함. `chunk_id`를 web `DocumentChunk`의 동기화 키로 사용.
 
 ## Docker 실행
 
@@ -102,46 +105,43 @@ docker exec -w /app privacy-genie-doc python -m unittest discover -s tests -v
 ```
 
 
+## 역할 분담
+
+| 일 | privacy-genie-doc (이 레포) | privacy_genie_web (Rails) |
+|---|---|---|
+| 문서 파싱·청킹 | O | |
+| 임베딩 모델 보유, 문서·질문 벡터 계산 | O | |
+| DB 스키마(벡터 컬럼 포함)·저장 | | O |
+| 벡터 검색(pgvector) | | O |
+| LLM 답변 생성, 사용자 요청 처리 | | O |
+
+- 문서와 질문은 반드시 같은 모델로 임베딩해야 하므로 모델은 doc 한 곳에만 둡니다. Python
+  생태계에서 바로 돌릴 수 있고, 평가 스크립트도 같은 모델을 씁니다.
+- doc은 web의 DB에 직접 쓰지 않습니다. 두 서비스가 같은 스키마에 묶이면 web의 마이그레이션이
+  doc을 깨뜨릴 수 있기 때문입니다. doc은 청크와 벡터를 넘기고, 저장은 web이 합니다.
+
 ### 처리 흐름
 
-```text
-개인정보보호 관련 문서
-        │
-        ▼
-문서 Parsing
-        │
-        ▼
-문서 구조 분석
-        │
-        ▼
-Chunking
-        │
-        ▼
-Embedding
-        │
-        ▼
-Vector DB 저장
-```
-
-사용자 질문에 대한 검색 요청이 들어오면 다음 과정을 수행합니다.
+문서 적재:
 
 ```text
-Rails 검색 요청
-        │
+[doc] 문서 Parsing → 구조 분석 → Chunking → 청크 Embedding
+        │  chunk_id, 청크 필드, 벡터
         ▼
-질문 Embedding
-        │
-        ▼
-Vector Search
-        │
-        ▼
-관련 Chunk 검색
-        │
-        ▼
-Rails로 검색 결과 반환
+[web] chunk_id 기준으로 DB에 저장
 ```
 
-즉, **개인정보보호 관련 문서를 AI 검색에 적합한 형태로 가공하고, 사용자 질문과 관련된 문서를 찾아 반환하는 역할**을 담당합니다.
+사용자 질문:
 
-LLM을 이용한 최종 답변 생성 및 사용자 요청 처리는 별도의 Rails 애플리케이션인 [privacy_genie_web](https://github.com/mady-21/privacy_genie_web)에서 담당합니다.
+```text
+[web] 사용자 질문
+        │
+        ▼
+[doc] 질문 Embedding (문서와 같은 모델)
+        │  질문 벡터
+        ▼
+[web] Vector Search(pgvector) → 관련 Chunk → LLM 답변
+```
+
+임베딩 API(doc)와 저장·검색(web)은 아직 구현 전입니다("앞으로 할 일").
 

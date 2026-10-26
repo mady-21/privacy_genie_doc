@@ -50,6 +50,21 @@ class PipelineTests(unittest.TestCase):
         document = LawStructureParser().parse(paragraphs)
         self.assertEqual(document['law']['effective_date'], '2026-09-11')
 
+    def test_penalty_chapter_includes_fines_but_excludes_criminal_articles(self):
+        paragraphs = [
+            '법', '제10장 벌칙', '제70조(벌칙) 형사처벌 조문.', '제75조(과태료) 과태료 조문.',
+        ]
+        chunks = LawChunker().chunk(LawStructureParser().parse(paragraphs))
+        article_numbers = {c['article_number'] for c in chunks}
+        self.assertNotIn('제70조', article_numbers)
+        self.assertIn('제75조', article_numbers)
+
+    def test_unknown_article_in_penalty_chapter_raises(self):
+        paragraphs = ['법', '제10장 벌칙', '제77조(신설 조문) 아직 분류되지 않은 조문.']
+        document = LawStructureParser().parse(paragraphs)
+        with self.assertRaises(ValueError):
+            LawChunker().chunk(document)
+
     def test_numeric_section_order(self):
         with TemporaryDirectory() as temp:
             path = Path(temp) / 'sample.hwpx'

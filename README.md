@@ -6,8 +6,8 @@
 ## 구조
 - app/parsers: HWPX 추출과 법령 공통 구조 파싱
 - app/chunkers/base_law_chunker.py: 텍스트 구성·조문 분할·메타데이터·JSON 저장
-- app/chunkers/act_chunker.py: 법률 처리 정책(제10장 벌칙 제외)
-- app/chunkers/decree_chunker.py: 시행령 처리 정책(제63조 과태료 제외)
+- app/chunkers/act_chunker.py: 법률 처리 정책(제10장 벌칙 중 형사처벌 조문만 제외, 과태료 조문은 포함)
+- app/chunkers/decree_chunker.py: 시행령 처리 정책(모든 조문 포함)
 - app/embeddings/embedding_text_builder.py: 임베딩 모델 입력 텍스트 생성(passage 프리픽스, 개정이력 annotation 제거)
 - documents/source/laws: privacy.hwpx, privacy_decree.hwpx
 - documents/source/guides: 가이드 원문 보관(전용 청커는 아직 미구현)
@@ -35,9 +35,17 @@ YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제
 같은 hwpx로 언제 다시 빌드해도 같은 결과가 나옵니다. 법령 전체의 `law_effective_date`,
 부칙의 `promulgation_date`도 모두 ISO(`YYYY-MM-DD`) 형식으로 통일되어 있습니다.
 
-제75조(과태료)에도 미시행 occurrence가 있지만, 제10장 벌칙 전체가 현재 제외되고 있어
-아직 청크로 나오지 않습니다 — 과태료 조문을 포함시킬 때(아래 "앞으로 할 일") 같이
-검증해야 합니다.
+예를 들어 제75조(과태료)는 occurrence 1(현행)은 `is_effective=true`, occurrence 2
+(제2항제15호가 2027-07-01부터 적용)는 `is_effective=false`로 나뉘어 청크화됩니다.
+
+## 제외 정책
+- 법률: 제10장 벌칙 중 형사처벌 조문(제70~74조의2)만 제외하고, 과태료 조문(제75·76조)은
+  포함합니다. 제외/포함 대상은 `ActChunker.EXCLUDED_ARTICLES` /
+  `INCLUDED_PENALTY_ARTICLES`에 (조번호, 제목)으로 명시되어 있고, 벌칙 장에 두 목록
+  어디에도 없는 조문이 나타나면(법 개정으로 조문이 추가·재배치된 경우) 조용히 넘어가지
+  않고 `ValueError`로 실패합니다. 이 경우 두 목록을 갱신해야 합니다.
+- 시행령: 모든 조문을 포함합니다. 제63조(과태료의 부과기준)는 본문이 "별표 2와 같다"뿐이라
+  과태료 대상·상한 질문까지만 답할 수 있습니다(금액 상세는 아래 "앞으로 할 일").
 
 ## 임베딩 텍스트
 `EmbeddingTextBuilder`는 청크의 원문(`text`, 인용·출력용으로 그대로 보존)과는 별도로,
@@ -54,9 +62,6 @@ annotation 제거 규칙을 검증하고(`tests/test_pipeline.py`, `tests/test_e
 실제 hwpx 문서로 회귀를 가드합니다(`tests/test_documents.py`).
 
 ## 앞으로 할 일
-- 과태료 조문 포함: `ActChunker`를 장(章) 단위 제외에서 조 단위 제외로 바꿔서, 제10장
-  벌칙 중 형벌 조문(제70~74조의2)은 제외하고 과태료 조문(제75·76조)은 포함. `DecreeChunker`의
-  제63조(과태료의 부과기준) 제외도 해제.
 - 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
   있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
 - 가이드·지침 문서 전용 청킹 전략.

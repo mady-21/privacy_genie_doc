@@ -21,13 +21,10 @@ class DocumentTests(unittest.TestCase):
         cases = (
             (
                 ACT_SOURCE_PATH, ActChunker(), "법률 제21445호", "제64조의2",
-                # 제75조(과태료)에도 occurrence 2(2027-07-01 미시행)가 있지만, 제10장
-                # 벌칙 전체가 현재 ActChunker에서 제외되고 있어 이 테스트의 chunk 목록에는
-                # 아직 등장하지 않는다 — 과태료 포함(A단계) 작업 때 함께 추가해야 한다.
                 {
                     ('제2조', 2), ('제7조의9', 2), ('제28조의12', 1), ('제28조의13', 1),
                     ('제28조의14', 1), ('제28조의15', 1), ('제32조의2', 2),
-                    ('제37조의2', 2),
+                    ('제37조의2', 2), ('제75조', 2),
                 },
             ),
             (
@@ -92,7 +89,11 @@ class DocumentTests(unittest.TestCase):
                 self.assertGreater(len(long_article_group), 1)
 
                 if chunker.DOCUMENT_TYPE == 'act':
-                    self.assertFalse(any(c['chapter'] == '제10장 벌칙' for c in chunks))
+                    penalty_chunks = [c for c in chunks if c['chapter'] == '제10장 벌칙']
+                    penalty_numbers = {c['article_number'] for c in penalty_chunks}
+                    self.assertEqual(penalty_numbers, {'제75조', '제76조'})
+                    for excluded in ('제70조', '제71조', '제72조', '제73조', '제74조', '제74조의2'):
+                        self.assertFalse(any(c['article_number'] == excluded for c in chunks))
                 else:
                     self.assertTrue(any(c['article_number'] == '제62조' for c in chunks))
-                    self.assertFalse(any(c['article_number'] == '제63조' and c['document_part'] == 'main' for c in chunks))
+                    self.assertTrue(any(c['article_number'] == '제63조' and c['document_part'] == 'main' for c in chunks))

@@ -16,9 +16,6 @@ DB(저장·기록·마이그레이션)와 검색은 [privacy_genie_web](https://
 - app/constants/embedding.py: 임베딩 모델 이름·벡터 차원·요청 제한
 - app/documents/law_documents.py: 문서 종류별 원본·청커·기대 제목(`LAW_SOURCES`), web 적재용 응답 생성
 - app/main.py: FastAPI 앱(`/health`, `/embeddings`, `/documents/{document_type}`)
-- app/evaluation/retrieval.py: 검색 평가 로직(정답 판정, Recall@k·MRR·현행 적중률)
-- evaluation/retrieval_eval_v1.json: 검색 평가셋 v1(30문항)
-- evaluate_retrieval.py: 임베딩 모델 하나로 평가셋을 돌리는 스크립트
 - documents/source/laws: privacy.hwpx, privacy_decree.hwpx
 - documents/source/guides: 가이드 원문 보관(전용 청커는 아직 미구현)
 - documents/processed/act, decree: 문서별 처리 결과
@@ -158,41 +155,25 @@ annotation 제거 규칙을 검증하고(`tests/test_pipeline.py`, `tests/test_e
 실제 hwpx 문서로 회귀를 가드합니다(`tests/test_documents.py`).
 
 ## 임베딩 모델 평가
-KURE-v1은 평가 없이 정했습니다(한국어 특화, bge-m3와 같은 구조라 바꾸기 쉬움). 평가셋
-`evaluation/retrieval_eval_v1.json`(30문항: 일반 23, 과태료 7)은 모델이나 청킹 기준을 바꿀지
-고민될 때 비교하는 기준으로 둡니다.
-- 적중 판정: 검색된 청크의 문서 종류·조번호가 정답 조문과 같으면 적중입니다(본문 조문만,
-  occurrence·part는 무시). 정답이 여러 조문이면 하나만 맞아도 적중입니다.
-- 주 지표: Recall@5(상위 5개 안에 정답이 있는 비율), MRR(정답 순위의 역수 평균).
-- 보조 지표: 현행본이 있는 문항(F1~F7, G11, G22)은 상위 5개에 `is_effective=true` 청크가
-  있어야 적중으로 보는 "현행 적중률"을 따로 셉니다. G15(미시행 조문뿐)에서 "현행이 아님"을
-  답하는지는 web 답변 평가에서 봅니다.
-- 30문항이라 한 문항이 Recall@5로 3.3%p입니다. 1~2문항 차이는 잡음으로 봅니다.
-- `tests/test_retrieval_eval.py`가 정답 조문이 실제 청크에 있는지 확인하므로, 법 개정으로
-  조문 번호가 바뀌면 테스트가 깨집니다. 그때 평가셋을 고칩니다.
+KURE-v1은 평가 없이 정했습니다(한국어 특화, bge-m3와 같은 구조라 바꾸기 쉬움). 검색은 web(pgvector)에서
+일어나므로 검색 품질 평가도 web으로 옮겼습니다. 평가셋(30문항)과 `search:evaluate` 사용법, 기준선 수치는
+[privacy_genie_web](https://github.com/mady-21/privacy_genie_web) README의 "검색 평가"를 보세요.
 
-분할 기준을 바꿔 가며 돌릴 수 있습니다(1,000자 기준은 512토큰 모델에 맞춘 값이라, 긴
-입력을 받는 모델은 분할하지 않은 조건과 같이 비교합니다).
-
-```bash
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1 --no-split
-docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai-lab/KURE-v1 --output documents/processed/eval/kure-v1.json
-```
+청킹 규칙(분할 기준, 제외 정책 등)을 바꿨다면 이 레포에서 `rebuild_chunks.py`로 다시 만들고, web에서
+`documents:sync` → `search:evaluate`로 기준선과 비교합니다.
 
 ## 앞으로 할 일
 - 분할 기준 재검토: 1,000자 분할은 512토큰 모델에 맞춘 값이었고 KURE-v1은 8,192토큰을
-  받습니다. 지금은 유지하고, 평가 스크립트(분할/비분할)나 질의 로그로 계속 쓸지 확인.
+  받습니다. 지금은 유지하고, 기준을 바꿔 rebuild한 뒤 web의 `search:evaluate`나 질의 로그로 비교.
 - 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
   있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
 - 가이드·지침 문서 전용 청킹 전략.
-- web 연동(web 레포):
-  - 마이그레이션: pgvector 확장, `document_chunks`에 `chunk_id`(unique)·`part_index`·`part_count`·
-    `is_effective`·`article_effective_date`·`embedding vector(1024)`, `documents`에 `embedding_model`.
-  - 동기화 rake 작업: `GET /documents/{act,decree}` → 문서 단위 트랜잭션으로 `chunk_id` 기준 upsert,
-    응답에 없는 청크 삭제. `embedding_model`이 저장된 값과 다르면 기존 벡터와 섞지 말고 전체 재적재.
-  - 검색: `POST /embeddings`로 질문 벡터를 받아 pgvector로 가까운 청크 검색 → LLM 답변.
-  - 부칙이 빠졌으므로 `document_supplements` 테이블을 어떻게 할지 결정.
+- 검색 품질(web 평가에서 드러난 청킹 쪽 과제):
+  - 시행령 제62조의3(규제의 재검토)처럼 다른 조문 번호를 나열하는 조문이 엉뚱한 질문에 상위로 올라옴.
+  - 한 조문의 여러 조각이 상위를 독차지함(예: CCTV 과태료 질문의 상위 5개가 전부 법 제75조 조각).
+  - F2("유출을 신고하지 않으면 어떤 제재")에서 정답 법 제75조가 33위. 위반 행위가 수십 개 나열된 조각이라
+    한 항목의 의미가 묻힘.
+- web: 연동(마이그레이션, `documents:sync`, pgvector 검색, 검색 평가)은 끝났고 LLM 답변이 남음.
 
 ## Docker 실행
 

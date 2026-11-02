@@ -13,7 +13,8 @@ class BaseLawChunker:
             self.MAX_CHUNK_CHARS = max_chunk_chars
 
     def should_exclude(self, article: dict) -> bool:
-        return False
+        # 부칙은 전부 제외한다(2026-10-21 결정). 시행일 판단은 조문의 [시행일: ...] 표기로 한다.
+        return article.get(DOCUMENT_PART, MAIN) != MAIN
 
     def chunk(self, document: dict) -> list[dict]:
         chunks = []

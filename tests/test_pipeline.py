@@ -16,20 +16,20 @@ class PipelineTests(unittest.TestCase):
             '가. 목', '이어지는 문장', '제2조(정의) 다른 본문',
             '[시행일: 2027. 3. 9.] 제2조', '제10장 벌칙',
             '제70조(벌칙) 제외', '부칙', '<제123호, 2026. 1. 1.>',
-            '제1조(시행일) 유지',
+            '제1조(시행일) 부칙이라 제외',
         ]
-        chunks = LawChunker().chunk(LawStructureParser().parse(paragraphs))
-        self.assertEqual(len(chunks), 3)
-        self.assertEqual(len({x['chunk_id'] for x in chunks}), 3)
+        document = LawStructureParser().parse(paragraphs)
+        self.assertEqual(document['supplements'][0]['law_number'], '법률 제123호')
+        chunks = LawChunker().chunk(document)
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(len({x['chunk_id'] for x in chunks}), 2)
+        self.assertTrue(all(c['document_part'] == 'main' for c in chunks))
         self.assertIn('가. 목\n이어지는 문장', chunks[0]['text'])
         self.assertIn('[시행일: 2027. 3. 9.]', chunks[1]['text'])
         self.assertTrue(chunks[0]['is_effective'])
         self.assertIsNone(chunks[0]['article_effective_date'])
         self.assertFalse(chunks[1]['is_effective'])
         self.assertEqual(chunks[1]['article_effective_date'], '2027-03-09')
-        self.assertEqual(chunks[2]['document_part'], 'supplementary')
-        self.assertIsNone(chunks[2]['chapter'])
-        self.assertEqual(chunks[2]['supplement']['law_number'], '법률 제123호')
         with TemporaryDirectory() as temp:
             path = EmbeddingTextBuilder().save_preview(
                 chunks, Path(temp) / 'preview.txt', ['제2조']

@@ -1,18 +1,21 @@
 ## privacy-genie-doc
 
-개인정보보호 관련 문서를 **RAG 검색에 활용할 수 있는 청크와 임베딩으로 가공하는 역할**로
-법령뿐만 아니라 향후 지침, 가이드, 평가자료 등 다양한 개인정보보호 관련 문서를 처리하는 것을 목표로 합니다.
-DB 저장과 검색은 [privacy_genie_web](https://github.com/mady-21/privacy_genie_web)이 맡습니다(아래 "역할 분담").
+개인정보보호 관련 문서를 **RAG 검색에 활용할 수 있는 청크와 임베딩으로 가공하는 역할**로 법령뿐만
+아니라 향후 지침, 가이드, 평가자료 등 다양한 개인정보보호 관련 문서를 처리하는 것을 목표로 합니다.
+DB(저장·기록·마이그레이션)와 검색은 [privacy_genie_web](https://github.com/mady-21/privacy_genie_web)(Rails)이
+관장합니다. doc은 청크와 벡터를 API로 내주고, 질문 벡터를 계산해 줍니다(아래 "역할 분담").
 
 ## 구조
 - app/parsers: HWPX 추출과 법령 공통 구조 파싱
 - app/chunkers/base_law_chunker.py: 텍스트 구성·조문 분할·메타데이터·JSON 저장
-- app/chunkers/act_chunker.py: 법률 처리 정책(제10장 벌칙 중 형사처벌 조문만 제외, 과태료 조문은 포함)
-- app/chunkers/decree_chunker.py: 시행령 처리 정책(모든 조문 포함)
+- app/chunkers/act_chunker.py: 법률 처리 정책(부칙과 제10장 벌칙 중 형사처벌 조문 제외, 과태료 조문은 포함)
+- app/chunkers/decree_chunker.py: 시행령 처리 정책(부칙을 뺀 본문 조문 모두 포함)
 - app/embeddings/embedding_text_builder.py: 임베딩 입력 텍스트 생성(개정이력 annotation 제거, 모델 중립)
 - app/embeddings/embedder.py: 임베딩 모델을 한 번만 불러와 텍스트를 정규화된 벡터로 변환
+- app/embeddings/store.py: 문서 벡터 파일 저장·불러오기(청크와 어긋났으면 거부)
 - app/constants/embedding.py: 임베딩 모델 이름·벡터 차원·요청 제한
-- app/main.py: FastAPI 앱(`/health`, `/embeddings`)
+- app/documents/law_documents.py: 문서 종류별 원본·청커·기대 제목(`LAW_SOURCES`), web 적재용 응답 생성
+- app/main.py: FastAPI 앱(`/health`, `/embeddings`, `/documents/{document_type}`)
 - app/evaluation/retrieval.py: 검색 평가 로직(정답 판정, Recall@k·MRR·현행 적중률)
 - evaluation/retrieval_eval_v1.json: 검색 평가셋 v1(30문항)
 - evaluate_retrieval.py: 임베딩 모델 하나로 평가셋을 돌리는 스크립트
@@ -46,12 +49,17 @@ YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제
 (제2항제15호가 2027-07-01부터 적용)는 `is_effective=false`로 나뉘어 청크화됩니다.
 
 ## 제외 정책
+- 부칙: 법률·시행령 모두 부칙 조문은 청크에서 뺍니다(2026-10-21 결정, 법률 4개·시행령 3개
+  청크). 파싱 결과(`law_structure.json`)에는 남아 있습니다. 조문의 시행 여부는 본문의
+  `[시행일: ...]` 표기로 판단하므로 지장이 없고, 잃는 건 전환기 질문(예: 시행령 부칙 제2조의
+  기존 보호책임자 신고 유예)에 대한 근거입니다. 판단은 `BaseLawChunker.should_exclude`에서
+  하고, 법률·시행령 청커가 이를 그대로 따릅니다.
 - 법률: 제10장 벌칙 중 형사처벌 조문(제70~74조의2)만 제외하고, 과태료 조문(제75·76조)은
   포함합니다. 제외/포함 대상은 `ActChunker.EXCLUDED_ARTICLES` /
   `INCLUDED_PENALTY_ARTICLES`에 (조번호, 제목)으로 명시되어 있고, 벌칙 장에 두 목록
   어디에도 없는 조문이 나타나면(법 개정으로 조문이 추가·재배치된 경우) 조용히 넘어가지
   않고 `ValueError`로 실패합니다. 이 경우 두 목록을 갱신해야 합니다.
-- 시행령: 모든 조문을 포함합니다. 제63조(과태료의 부과기준)는 본문이 "별표 2와 같다"뿐이라
+- 시행령: 본문 조문은 모두 포함합니다. 제63조(과태료의 부과기준)는 본문이 "별표 2와 같다"뿐이라
   과태료 대상·상한 질문까지만 답할 수 있습니다(금액 상세는 아래 "앞으로 할 일").
 
 ## 임베딩 텍스트
@@ -66,11 +74,64 @@ YYYY. M. D.] ...`로 표시)가 같은 조번호로 섞여 있습니다(예: 제
 임베딩 모델은 `nlpai-lab/KURE-v1`(1024차원, 최대 8,192토큰, MIT)입니다. bge-m3를 한국어 검색
 데이터로 추가 학습한 모델이고, 입력에 `query:`/`passage:` 같은 프리픽스가 필요 없습니다.
 모델 이름과 차원은 `app/constants/embedding.py` 한 곳에 있고, 서버가 뜰 때 실제 모델 차원이
-`EMBEDDING_DIMENSION`과 다르면 시작하지 않습니다. 모델을 바꾸면 web의 벡터 컬럼 차원도
-같이 바꿔야 하기 때문입니다.
+`EMBEDDING_DIMENSION`과 다르면 시작하지 않습니다. 모델을 바꾸면 문서 벡터를 전부 다시
+만들어야 하기 때문입니다.
 
-`POST /embeddings`는 텍스트 목록을 받아 같은 순서로 벡터를 돌려줍니다. 벡터는 길이 1로
-정규화되어 있어서 내적이 곧 코사인 유사도입니다.
+### 문서 벡터 파일
+문서 청크를 임베딩하는 건 CPU에서 수 분이 걸려서(법률 약 6.5분, 시행령 약 3.7분), 요청 때마다
+하지 않고 `rebuild_chunks.py`가 청크와 함께 `documents/processed/{act,decree}/embeddings.npz`로
+저장합니다. 파일에는 벡터와 함께 청크 목록, 임베딩 입력 텍스트의 해시, 모델 이름이 들어 있어서
+다음 경우에는 `GET /documents`가 503과 "rebuild를 다시 하라"는 메시지를 돌려줍니다.
+- 파일이 없음
+- 다른 모델로 만든 벡터
+- `chunks.json`의 청크 목록이 바뀜(`--skip-embeddings`로 청크만 다시 만든 경우 등)
+- `chunk_id`는 같은데 본문이나 정제 규칙이 바뀜(개정이력 표기만 바뀐 건 임베딩 입력에서 빠지므로 괜찮음)
+
+### `GET /documents/{document_type}` — web 적재용
+web(Rails)의 동기화 작업이 부르는 API입니다. `document_type`은 `act` 또는 `decree`이고, 그 외는
+422입니다. 위 파일을 읽어서 문서 정보와 청크 전체를 벡터와 함께 돌려줍니다. 임베딩을 다시
+계산하지 않아서 1초 안에 응답합니다(법률 156청크 3.6MB, 시행령 168청크 3.9MB). 부칙은 없습니다.
+
+```json
+{
+  "source_key": "privacy",
+  "document_type": "act",
+  "name": "개인정보 보호법",
+  "law_number": "법률 제21445호",
+  "law_effective_date": "2026-09-11",
+  "embedding_model": "nlpai-lab/KURE-v1",
+  "embedding_dimension": 1024,
+  "chunks": [
+    {
+      "chunk_id": "법률 제21445호:main:제1조:1",
+      "position": 1,
+      "article_number": "제1조",
+      "article_title": "목적",
+      "chapter": "제1장 총칙",
+      "section": null,
+      "text": "원문 그대로(인용·표시용)",
+      "part_index": 1,
+      "part_count": 1,
+      "is_effective": true,
+      "article_effective_date": null,
+      "metadata": {},
+      "embedding": [0.0123, "... 1024개"]
+    }
+  ]
+}
+```
+
+- `source_key`는 원본 파일 이름(`privacy`, `privacy_decree`)이라 법이 개정돼도 같습니다.
+- `chunk_id`는 같은 원문이면 항상 같은 값이라 web은 이걸 키로 upsert하고, 응답에 없는 청크는
+  지우면 됩니다. `position`은 응답 안의 순서(1부터)입니다.
+- `text`는 원문 그대로이고 `embedding`은 개정이력 표기를 걷어낸 텍스트로 계산한 값입니다.
+- 미시행 조문도 `is_effective=false`와 `article_effective_date`를 붙여서 그대로 넣습니다.
+  검색에서 거를지, "아직 시행 전"이라고 답할지는 web이 정합니다.
+
+### `POST /embeddings` — 질문 벡터
+web이 사용자 질문을 벡터로 바꿀 때 부릅니다. web은 이 벡터로 자기 DB(pgvector)에서 검색합니다.
+문서 벡터와 같은 모델이라 바로 비교할 수 있고, 벡터는 길이 1로 정규화되어 있어서 내적이 곧
+코사인 유사도입니다.
 
 ```bash
 curl -X POST localhost:8000/embeddings -H 'Content-Type: application/json' \
@@ -125,9 +186,13 @@ docker exec -w /app privacy-genie-doc python evaluate_retrieval.py --model nlpai
 - 과태료 금액 상세: 제63조 본문은 "별표 2와 같다"만 있고 실제 금액은 HWPX 표(별표)에
   있는데, `HwpxParser`가 표를 버리고 있어 별도 표 파싱이 필요.
 - 가이드·지침 문서 전용 청킹 전략.
-- 적재 경로: 청크와 벡터를 web에 넘기는 방법(API 또는 일괄 파일) 정하고 구현.
-- web 연동: 벡터 차원(1024), `chunk_id` 형식, `is_effective` 등 청크 필드를 web에 전달해서
-  스키마·저장·검색을 구현하게 함. `chunk_id`를 web `DocumentChunk`의 동기화 키로 사용.
+- web 연동(web 레포):
+  - 마이그레이션: pgvector 확장, `document_chunks`에 `chunk_id`(unique)·`part_index`·`part_count`·
+    `is_effective`·`article_effective_date`·`embedding vector(1024)`, `documents`에 `embedding_model`.
+  - 동기화 rake 작업: `GET /documents/{act,decree}` → 문서 단위 트랜잭션으로 `chunk_id` 기준 upsert,
+    응답에 없는 청크 삭제. `embedding_model`이 저장된 값과 다르면 기존 벡터와 섞지 말고 전체 재적재.
+  - 검색: `POST /embeddings`로 질문 벡터를 받아 pgvector로 가까운 청크 검색 → LLM 답변.
+  - 부칙이 빠졌으므로 `document_supplements` 테이블을 어떻게 할지 결정.
 
 ## Docker 실행
 
@@ -137,45 +202,39 @@ docker exec -w /app privacy-genie-doc python rebuild_chunks.py --type decree
 docker exec -w /app privacy-genie-doc python -m unittest discover -s tests -v
 ```
 
+- `rebuild_chunks.py`는 청크와 문서 벡터를 같이 만듭니다(벡터 계산에 CPU로 수 분). 청크만
+  빠르게 확인하려면 `--skip-embeddings`를 붙이되, 그 상태로는 벡터가 청크와 어긋나서
+  `GET /documents`가 503을 돌려줍니다.
+- `GET /documents`는 요청마다 파일을 읽으므로 rebuild 뒤에 서버를 재시작할 필요는 없습니다.
+  rebuild 뒤에는 web의 동기화 작업을 다시 돌리면 됩니다.
 
 ## 역할 분담
 
 | 일 | privacy-genie-doc (이 레포) | privacy_genie_web (Rails) |
 |---|---|---|
-| 문서 파싱·청킹 | O | |
-| 임베딩 모델 보유, 문서·질문 벡터 계산 | O | |
-| DB 스키마(벡터 컬럼 포함)·저장 | | O |
-| 벡터 검색(pgvector) | | O |
-| LLM 답변 생성, 사용자 요청 처리 | | O |
+| 원본 파싱·청킹, 문서 벡터 계산(rebuild, 파일 저장) | O | |
+| 청크+벡터 제공 `GET /documents/{type}` | O | |
+| 질문 벡터 계산 `POST /embeddings` | O | |
+| 스키마·마이그레이션(pgvector, 벡터 컬럼), 저장·기록 | | O |
+| 동기화 작업(doc API → DB), pgvector 검색, LLM 답변 | | O |
 
-- 문서와 질문은 반드시 같은 모델로 임베딩해야 하므로 모델은 doc 한 곳에만 둡니다. Python
-  생태계에서 바로 돌릴 수 있고, 평가 스크립트도 같은 모델을 씁니다.
-- doc은 web의 DB에 직접 쓰지 않습니다. 두 서비스가 같은 스키마에 묶이면 web의 마이그레이션이
-  doc을 깨뜨릴 수 있기 때문입니다. doc은 청크와 벡터를 넘기고, 저장은 web이 합니다.
+- DB의 모든 것(마이그레이션, 기록)은 Rails가 관장합니다. doc은 DB에 직접 쓰지 않고 API로
+  데이터를 내주기만 합니다.
+- 문서와 질문은 반드시 같은 모델로 임베딩해야 하므로 모델은 doc 한 곳에만 둡니다.
 
 ### 처리 흐름
 
-문서 적재:
+문서 적재(원문이 바뀔 때):
 
 ```text
-[doc] 문서 Parsing → 구조 분석 → Chunking → 청크 Embedding
-        │  chunk_id, 청크 필드, 벡터
-        ▼
-[web] chunk_id 기준으로 DB에 저장
+[doc] rebuild_chunks.py: 원본 Parsing → 구조 분석 → Chunking → 청크 Embedding → chunks.json + embeddings.npz
+[web] 동기화 작업 ──GET /documents/{act,decree}──▶ [doc] 파일을 읽어 청크+벡터 응답
+[web] chunk_id 기준으로 DB(pgvector)에 저장
 ```
 
 사용자 질문:
 
 ```text
-[web] 사용자 질문
-        │
-        ▼
-[doc] 질문 Embedding (문서와 같은 모델)
-        │  질문 벡터
-        ▼
-[web] Vector Search(pgvector) → 관련 Chunk → LLM 답변
+[web] 사용자 질문 ──POST /embeddings──▶ [doc] 질문 벡터
+[web] pgvector로 가까운 청크 검색 → LLM 답변
 ```
-
-질문 임베딩(`POST /embeddings`)은 구현되어 있습니다. 청크와 벡터를 web에 넘기는 적재 경로와
-web의 저장·검색은 아직 구현 전입니다("앞으로 할 일").
-

@@ -1,6 +1,6 @@
-"개인정보 보호법: 조 단위 청킹. 제10장 벌칙 중 형벌 조문만 제외(과태료는 포함, 2026-10-21 결정)."
+"개인정보 보호법: 조 단위 청킹. 부칙과 제10장 벌칙 중 형벌 조문은 제외(과태료는 포함, 2026-10-21 결정)."
 import re
-from app.constants.law import CHAPTER, DOCUMENT_PART, LOCATION, MAIN, NUMBER, TITLE
+from app.constants.law import CHAPTER, LOCATION, NUMBER, TITLE
 from app.chunkers.base_law_chunker import BaseLawChunker
 
 
@@ -21,8 +21,8 @@ class ActChunker(BaseLawChunker):
     })
 
     def should_exclude(self, article: dict) -> bool:
-        if article.get(DOCUMENT_PART, MAIN) != MAIN:
-            return False
+        if super().should_exclude(article):
+            return True
         chapter = article[LOCATION].get(CHAPTER) or ""
         if not self.PENALTY_CHAPTER_PATTERN.match(chapter.strip()):
             return False

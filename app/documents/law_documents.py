@@ -1,4 +1,4 @@
-"법령 원문(hwpx)을 문서 종류별로 파싱·청킹하고, 미리 만든 청크·벡터를 web 적재용으로 묶는다."
+"법령 문서 종류별 원본·청커를 정의하고, 미리 만든 청크·벡터를 web 적재용으로 묶는다."
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,8 +13,6 @@ from app.constants.law import (
 )
 from app.constants.paths import ACT_SOURCE_PATH, CHUNKS_FILENAME, DECREE_SOURCE_PATH, EMBEDDINGS_FILENAME, TEXT_ENCODING
 from app.embeddings.store import REBUILD_HINT, load_embeddings
-from app.parsers.hwpx_parser import HwpxParser
-from app.parsers.law_structure_parser import LawStructureParser
 
 
 @dataclass(frozen=True)
@@ -34,13 +32,6 @@ def check_law_name(document_type: str, document: dict) -> None:
     expected = LAW_SOURCES[document_type].expected_name
     if document[LAW][NAME] != expected:
         raise ValueError(f'{document_type} 원문의 제목이 "{expected}"가 아닙니다: {document[LAW][NAME]}')
-
-
-def chunk_law_document(document_type: str, max_chunk_chars: float | None = None) -> tuple[dict, list[dict]]:
-    source = LAW_SOURCES[document_type]
-    document = LawStructureParser().parse(HwpxParser(str(source.path)).parse())
-    check_law_name(document_type, document)
-    return document, source.chunker_class(max_chunk_chars).chunk(document)
 
 
 def load_document_export(document_type: str, processed_dir: Path) -> dict:

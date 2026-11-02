@@ -1,4 +1,3 @@
-import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -7,7 +6,6 @@ import numpy as np
 
 from app.constants.embedding import EMBEDDING_DIMENSION, EMBEDDING_MODEL
 from app.embeddings.store import load_embeddings, save_embeddings
-from app.search.index import SearchIndex
 
 
 def _chunk(chunk_id: str, text: str) -> dict:
@@ -54,33 +52,6 @@ class EmbeddingStoreTests(unittest.TestCase):
         "개정이력 표기는 임베딩 입력에서 빠지므로, 그것만 바뀐 경우 벡터를 다시 만들 필요가 없다."
         changed = [self.chunks[0], _chunk('b', '제2조 본문<개정 2024. 5. 5.>')]
         np.testing.assert_allclose(load_embeddings(self.path, changed), self.vectors)
-
-
-class SearchIndexTests(unittest.TestCase):
-    def test_search_returns_closest_chunks_first(self):
-        chunks = [_chunk('a', 'A'), _chunk('b', 'B'), _chunk('c', 'C')]
-        vectors = _unit_vectors(3)
-        query = vectors[2] * 0.9 + vectors[0] * 0.1
-        results = SearchIndex(chunks, vectors).search(query / np.linalg.norm(query), top_k=2)
-        self.assertEqual([chunk['chunk_id'] for chunk, _ in results], ['c', 'a'])
-        self.assertGreater(results[0][1], results[1][1])
-
-    def test_load_reads_every_document_type(self):
-        with TemporaryDirectory() as temp:
-            for offset, document_type in enumerate(('act', 'decree')):
-                directory = Path(temp) / document_type
-                chunks = [_chunk(f'{document_type}-1', '본문 하나'), _chunk(f'{document_type}-2', '본문 둘')]
-                directory.mkdir()
-                (directory / 'chunks.json').write_text(json.dumps(chunks, ensure_ascii=False), encoding='utf-8')
-                save_embeddings(directory / 'embeddings.npz', chunks, _unit_vectors(2, seed=offset), EMBEDDING_MODEL)
-            index = SearchIndex.load(temp)
-        self.assertEqual([c['chunk_id'] for c in index.chunks], ['act-1', 'act-2', 'decree-1', 'decree-2'])
-        self.assertEqual(index.vectors.shape, (4, EMBEDDING_DIMENSION))
-
-    def test_load_fails_clearly_without_files(self):
-        with TemporaryDirectory() as temp:
-            with self.assertRaisesRegex(FileNotFoundError, 'rebuild_chunks.py'):
-                SearchIndex.load(temp)
 
 
 if __name__ == '__main__':

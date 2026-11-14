@@ -177,6 +177,12 @@ KURE-v1은 평가 없이 정했습니다(한국어 특화, bge-m3와 같은 구�
 
 ## Docker 실행
 
+처음 받았을 때는 compose가 읽는 `.env`를 먼저 만듭니다(지금은 채울 값이 없습니다).
+
+```bash
+cp .env.example .env
+```
+
 ```bash
 docker exec -w /app privacy-genie-doc python rebuild_chunks.py --type act
 docker exec -w /app privacy-genie-doc python rebuild_chunks.py --type decree

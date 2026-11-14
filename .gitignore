@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Claude Code가 만드는 작업용 worktree(레포 전체 사본)는 올리지 않는다.
+/.claude/worktrees/
+
 # Python bytecode and caches
 __pycache__/
 *.py[cod]
